@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
         return {"message": "ARA API"}
 
     # Importing health registers its routes on the shared API router.
+    import ara.auth  # noqa: F401
     import ara.health  # noqa: F401
 
     app.include_router(api_router)

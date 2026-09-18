@@ -38,3 +38,12 @@ the database is unavailable. Every response includes an `X-Correlation-ID`
 header. Expected validation and domain failures use an `error` object with a
 safe code and message; request logs contain only request metadata and the
 correlation ID, never headers, cookies, query strings, or settings.
+
+## OIDC login
+
+`GET /auth/login` discovers the configured provider and starts an Authorization
+Code flow. `GET /auth/callback` validates state, nonce, issuer, audience,
+signature, and token lifetime before creating a local user and issuing an
+HttpOnly, Secure, SameSite=Lax session cookie. `GET /auth/session` returns the
+safe local profile for that session and `POST /auth/logout` removes it. OIDC
+access and ID tokens are never returned to the browser or persisted by ARA.
