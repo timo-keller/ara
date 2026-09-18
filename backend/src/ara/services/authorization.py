@@ -57,9 +57,7 @@ class RoleResolutionService:
         self.mappings = RoleMappingDAO(session)
         self.owner_subjects = parse_owner_subjects(owner_subjects)
 
-    async def resolve(
-        self, user: User, claims: Mapping[str, Any]
-    ) -> EffectiveRoles:
+    async def resolve(self, user: User, claims: Mapping[str, Any]) -> EffectiveRoles:
         """Evaluate all enabled mappings in priority/identifier order.
 
         Group Admin wins over User when several mappings match the same group.
