@@ -65,3 +65,10 @@ JMESPath role mappings can be evaluated; they are never returned by the API or
 written to request logs. `ARA_OWNER_SUBJECTS` is a comma- or newline-separated
 bootstrap Owner subject allowlist and should be supplied via
 `ARA_OWNER_SUBJECTS_FILE` in production.
+
+## Role mappings
+
+Only Owners can manage `/api/role-mappings`. Mappings can be created, listed,
+updated, disabled, and archived. `POST /api/role-mappings/test` evaluates an
+expression against the Owner's server-side session claims and returns only a
+boolean `matches` result; it never persists the expression or returns claims.
