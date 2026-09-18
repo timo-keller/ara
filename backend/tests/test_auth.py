@@ -1,5 +1,7 @@
 import asyncio
+import uuid
 from collections.abc import AsyncIterator, Iterator, Mapping
+from datetime import timedelta
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -7,9 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-import ara.auth as auth
-from ara.config import Settings
-from ara.database import Base, create_engine, create_session_factory
+import ara.api.routers.auth as auth
+from ara.core.config import Settings
+from ara.domain.models import ApplicationSession, utc_now
+from ara.infrastructure import oidc
+from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
 
 
@@ -26,7 +30,7 @@ def settings() -> Settings:
     )
 
 
-class MockProvider(auth.OidcClient):
+class MockProvider(oidc.OidcClient):
     """A mocked provider which records only non-secret protocol inputs."""
 
     def __init__(self, configured_settings: Settings) -> None:
@@ -60,10 +64,13 @@ class MockProvider(auth.OidcClient):
         }
 
 
+AuthenticatedClient = tuple[TestClient, MockProvider, async_sessionmaker[AsyncSession]]
+
+
 @pytest.fixture
 def authenticated_client(  # type: ignore[no-untyped-def]
     tmp_path, monkeypatch
-) -> Iterator[tuple[TestClient, MockProvider]]:
+) -> Iterator[AuthenticatedClient]:
     configured_settings = settings()
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     session_factory = create_session_factory(engine)
@@ -79,7 +86,7 @@ def authenticated_client(  # type: ignore[no-untyped-def]
     app.dependency_overrides[auth.get_session] = session_dependency(session_factory)
     monkeypatch.setattr(auth, "get_settings", lambda: configured_settings)
     with TestClient(app, base_url="https://ara.example.test") as client:
-        yield client, provider
+        yield client, provider, session_factory
     asyncio.run(engine.dispose())
 
 
@@ -94,9 +101,9 @@ def session_dependency(
 
 
 def test_oidc_login_callback_session_and_logout(
-    authenticated_client: tuple[TestClient, MockProvider],
+    authenticated_client: AuthenticatedClient,
 ) -> None:
-    client, provider = authenticated_client
+    client, provider, _session_factory = authenticated_client
 
     login = client.get("/auth/login", follow_redirects=False)
 
@@ -118,6 +125,7 @@ def test_oidc_login_callback_session_and_logout(
     assert callback.status_code == 302
     assert provider.nonce is not None
     assert "ara_session=" in callback.headers["set-cookie"]
+    assert client.cookies.get(auth.CSRF_COOKIE)
     assert "provider-id-token" not in callback.text
     assert "provider-client-secret" not in callback.text
     current_session = client.get("/auth/session").json()
@@ -130,16 +138,19 @@ def test_oidc_login_callback_session_and_logout(
         },
     }
 
-    logout = client.post("/auth/logout")
+    logout = client.post(
+        "/auth/logout", headers={auth.CSRF_HEADER: client.cookies[auth.CSRF_COOKIE]}
+    )
     assert logout.status_code == 204
-    assert "ara_session=\"\"" in logout.headers["set-cookie"]
+    assert 'ara_session=""' in logout.headers["set-cookie"]
     assert client.get("/auth/session").json() == {"authenticated": False}
 
 
 def test_callback_failure_is_safe_and_does_not_leak_provider_values(
-    authenticated_client: tuple[TestClient, MockProvider], monkeypatch
+    authenticated_client: AuthenticatedClient,
+    monkeypatch,
 ) -> None:
-    client, provider = authenticated_client
+    client, provider, _session_factory = authenticated_client
     login = client.get("/auth/login", follow_redirects=False)
     state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
 
@@ -154,12 +165,12 @@ def test_callback_failure_is_safe_and_does_not_leak_provider_values(
             pass
 
         async def post(self, *args: object, **kwargs: object) -> None:
-            raise auth.httpx.ConnectError(
+            raise oidc.httpx.ConnectError(
                 "provider-id-token and provider-client-secret"
             )
 
-    failing_client = auth.OidcClient(provider.settings)
-    monkeypatch.setattr(auth.httpx, "AsyncClient", UnavailableProviderHttpClient)
+    failing_client = oidc.OidcClient(provider.settings)
+    monkeypatch.setattr(oidc.httpx, "AsyncClient", UnavailableProviderHttpClient)
 
     async def failed_exchange(code: str, metadata: Mapping[str, str]) -> str:
         return await failing_client.exchange_code(code, metadata)
@@ -176,3 +187,93 @@ def test_callback_failure_is_safe_and_does_not_leak_provider_values(
     }
     assert "provider-id-token" not in response.text
     assert "provider-client-secret" not in response.text
+
+
+def _login(client: TestClient) -> None:
+    login = client.get("/auth/login", follow_redirects=False)
+    state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
+    callback = client.get(
+        "/auth/callback",
+        params={"code": "authorization-code", "state": state},
+        follow_redirects=False,
+    )
+    assert callback.status_code == 302
+
+
+def _application_session_id(client: TestClient) -> uuid.UUID:
+    payload = auth._decode(
+        client.cookies[auth.SESSION_COOKIE],
+        settings().session_secret.get_secret_value(),
+    )
+    assert payload is not None
+    return uuid.UUID(payload["session_id"])
+
+
+def test_logout_rejects_anonymous_and_missing_or_invalid_csrf(
+    authenticated_client: AuthenticatedClient,
+) -> None:
+    client, _provider, _session_factory = authenticated_client
+
+    assert client.post("/auth/logout").status_code == 401
+    _login(client)
+    assert client.post("/auth/logout").status_code == 403
+    assert (
+        client.post(
+            "/auth/logout", headers={auth.CSRF_HEADER: "not-the-csrf-token"}
+        ).status_code
+        == 403
+    )
+
+
+def test_expired_and_revoked_sessions_are_rejected(
+    authenticated_client: AuthenticatedClient,
+) -> None:
+    client, _provider, session_factory = authenticated_client
+    _login(client)
+
+    async def expire_session() -> None:
+        async with session_factory() as session:
+            application_session = await session.get(
+                ApplicationSession,
+                _application_session_id(client),
+            )
+            assert application_session is not None
+            application_session.expires_at = utc_now() - timedelta(seconds=1)
+            await session.commit()
+
+    asyncio.run(expire_session())
+    assert client.get("/auth/session").json() == {"authenticated": False}
+
+    _login(client)
+    csrf_token = client.cookies[auth.CSRF_COOKIE]
+    session_cookie = client.cookies[auth.SESSION_COOKIE]
+    logout = client.post("/auth/logout", headers={auth.CSRF_HEADER: csrf_token})
+    assert logout.status_code == 204
+    response = client.post(
+        "/auth/logout",
+        headers={auth.CSRF_HEADER: csrf_token},
+        cookies={auth.SESSION_COOKIE: session_cookie, auth.CSRF_COOKIE: csrf_token},
+    )
+    assert response.status_code == 401
+
+
+def test_session_is_renewed_near_expiry(
+    authenticated_client: AuthenticatedClient,
+) -> None:
+    client, _provider, session_factory = authenticated_client
+    _login(client)
+
+    async def shorten_session() -> None:
+        async with session_factory() as session:
+            application_session = await session.get(
+                ApplicationSession,
+                _application_session_id(client),
+            )
+            assert application_session is not None
+            application_session.expires_at = utc_now() + timedelta(minutes=5)
+            await session.commit()
+
+    asyncio.run(shorten_session())
+    response = client.get("/auth/session")
+    assert response.json()["authenticated"] is True
+    assert "ara_session=" in response.headers["set-cookie"]

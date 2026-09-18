@@ -6,9 +6,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from ara.api import api_router, auth_router
-from ara.errors import DomainError
-from ara.request_context import add_request_context, get_correlation_id
+from ara.api.routers import api_router, auth_router
+from ara.core.errors import DomainError
+from ara.core.request_context import add_request_context, get_correlation_id
 
 
 def _error_response(
@@ -65,9 +65,9 @@ def create_app() -> FastAPI:
     async def index() -> dict[str, str]:
         return {"message": "ARA API"}
 
-    # Importing health registers its routes on the shared API router.
-    import ara.auth  # noqa: F401
-    import ara.health  # noqa: F401
+    # Importing routers registers their routes on the shared router instances.
+    import ara.api.routers.auth  # noqa: F401
+    import ara.api.routers.health  # noqa: F401
 
     app.include_router(api_router)
     app.include_router(auth_router)

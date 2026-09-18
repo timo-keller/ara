@@ -5,8 +5,9 @@ import uuid
 from fastapi import Query
 from fastapi.testclient import TestClient
 
-from ara.errors import DomainError
+from ara.core.errors import DomainError
 from ara.main import create_app
+from ara.services.health import get_health_service
 
 
 def test_routes_are_mounted_and_responses_have_correlation_ids() -> None:
@@ -32,7 +33,7 @@ def test_liveness_does_not_require_a_database(monkeypatch) -> None:  # type: ign
     def unavailable_engine() -> None:
         raise AssertionError("liveness must not access the database")
 
-    monkeypatch.setattr("ara.health.get_engine", unavailable_engine)
+    monkeypatch.setattr("ara.services.health.get_engine", unavailable_engine)
 
     response = TestClient(create_app()).get("/api/health/live")
 
@@ -43,12 +44,14 @@ def test_liveness_does_not_require_a_database(monkeypatch) -> None:  # type: ign
 def test_readiness_returns_service_unavailable_when_database_is_unavailable(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
-    def unavailable_engine() -> None:
-        raise OSError("database unavailable")
+    class UnavailableHealthService:
+        async def is_ready(self) -> bool:
+            return False
 
-    monkeypatch.setattr("ara.health.get_engine", unavailable_engine)
+    app = create_app()
+    app.dependency_overrides[get_health_service] = UnavailableHealthService
 
-    response = TestClient(create_app()).get("/api/health/ready")
+    response = TestClient(app).get("/api/health/ready")
 
     assert response.status_code == 503
     assert response.json()["error"] == {

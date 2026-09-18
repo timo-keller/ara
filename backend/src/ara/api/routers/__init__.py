@@ -1,4 +1,4 @@
-"""Shared REST API conventions and routers."""
+"""Mounted REST routers."""
 
 from fastapi import APIRouter
 

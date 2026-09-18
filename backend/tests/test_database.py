@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from alembic import command
-from ara.database import (
+from ara.infrastructure.database import (
     SQLITE_BUSY_TIMEOUT_MS,
     create_engine,
     create_session_factory,
@@ -93,7 +93,7 @@ def test_alembic_upgrades_a_fresh_database(tmp_path: Path) -> None:
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             )
         }
-    assert version == ("0002_core_domain_schema",)
+    assert version == ("0003_application_sessions",)
     assert {
         "users",
         "groups",
@@ -102,6 +102,7 @@ def test_alembic_upgrades_a_fresh_database(tmp_path: Path) -> None:
         "reservations",
         "notifications",
         "audit_events",
+        "application_sessions",
     } <= tables
 
 
@@ -129,6 +130,7 @@ def test_alembic_downgrade_and_subsequent_upgrade(tmp_path: Path) -> None:
             "reservations",
             "notifications",
             "audit_events",
+            "application_sessions",
         }
         & tables_after_downgrade
     )
@@ -138,7 +140,7 @@ def test_alembic_downgrade_and_subsequent_upgrade(tmp_path: Path) -> None:
         version = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
-    assert version == ("0002_core_domain_schema",)
+    assert version == ("0003_application_sessions",)
 
 
 def test_core_schema_enforces_integrity_constraints(tmp_path: Path) -> None:

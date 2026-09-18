@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-from ara.config import get_settings
+from ara.core.config import get_settings
 
 SQLITE_BUSY_TIMEOUT_MS = 5_000
 

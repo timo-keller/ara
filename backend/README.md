@@ -39,11 +39,24 @@ header. Expected validation and domain failures use an `error` object with a
 safe code and message; request logs contain only request metadata and the
 correlation ID, never headers, cookies, query strings, or settings.
 
+## Backend layout
+
+HTTP routers and API schemas live in `ara.api`; routers delegate business rules
+and transaction boundaries to `ara.services`. Persistence queries without
+commits live in `ara.daos`, SQLAlchemy models in `ara.domain`, and database/OIDC
+adapters in `ara.infrastructure`. Configuration, errors, and request context
+helpers are in `ara.core`.
+
 ## OIDC login
 
 `GET /auth/login` discovers the configured provider and starts an Authorization
 Code flow. `GET /auth/callback` validates state, nonce, issuer, audience,
 signature, and token lifetime before creating a local user and issuing an
-HttpOnly, Secure, SameSite=Lax session cookie. `GET /auth/session` returns the
-safe local profile for that session and `POST /auth/logout` removes it. OIDC
-access and ID tokens are never returned to the browser or persisted by ARA.
+HttpOnly, Secure, SameSite=Lax session cookie. Sessions are persisted server
+side, expire after eight hours of inactivity, renew during their final hour,
+and are revoked on logout. The callback also issues an `ara_csrf` cookie; the
+frontend must send its value in `X-CSRF-Token` for unsafe authenticated calls.
+`GET /auth/session` returns the safe local profile and `POST /auth/logout`
+revokes the session. REST handlers can use `require_authenticated_user` and
+`require_csrf` from `ara.api.routers.auth` as reusable dependencies. OIDC access and ID
+tokens are never returned to the browser or persisted by ARA.

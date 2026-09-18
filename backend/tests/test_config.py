@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from ara.config import ConfigurationError, Settings
+from ara.core.config import ConfigurationError, Settings
 
 
 def environment() -> dict[str, str]:

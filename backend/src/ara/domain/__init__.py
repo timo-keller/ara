@@ -1,0 +1,1 @@
+"""ARA domain entities."""

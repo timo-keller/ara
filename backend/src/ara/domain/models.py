@@ -28,7 +28,7 @@ from sqlalchemy import (
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ara.database import Base
+from ara.infrastructure.database import Base
 
 
 def utc_now() -> datetime:
@@ -115,6 +115,34 @@ class User(Base):
     reservations: Mapped[list[Reservation]] = relationship(back_populates="user")
     notifications: Mapped[list[Notification]] = relationship(back_populates="user")
     audit_events: Mapped[list[AuditEvent]] = relationship(back_populates="actor")
+    sessions: Mapped[list[ApplicationSession]] = relationship(back_populates="user")
+
+
+class ApplicationSession(Base):
+    """A revocable browser session; only its opaque identifier is cookie-bound."""
+
+    __tablename__ = "application_sessions"
+    __table_args__ = (
+        Index("ix_application_sessions_user_expires", "user_id", "expires_at"),
+        Index("ix_application_sessions_expires", "expires_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    csrf_token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        nullable=False,
+        default=utc_now,
+        server_default=func.current_timestamp(),
+    )
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    renewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+    user: Mapped[User] = relationship(back_populates="sessions")
 
 
 class Group(Base):
