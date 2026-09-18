@@ -1,6 +1,7 @@
 """Authentication business rules and application-session transactions."""
 
 import hashlib
+import json
 import secrets
 import uuid
 from collections.abc import Mapping
@@ -76,6 +77,7 @@ class AuthenticationService:
         application_session = ApplicationSession(
             user_id=user.id,
             csrf_token_hash=csrf_token_hash(csrf_token),
+            oidc_claims=_session_claims(claims),
             expires_at=now + timedelta(seconds=SESSION_TTL_SECONDS),
         )
         self.sessions.add(application_session)
@@ -120,3 +122,20 @@ class AuthenticationService:
     async def revoke_session(self, application_session: ApplicationSession) -> None:
         application_session.revoked_at = utc_now()
         await self.session.commit()
+
+
+def _session_claims(claims: Mapping[str, Any]) -> dict[str, Any]:
+    """Copy JSON OIDC claims for server-side role evaluation only.
+
+    ID token claims are JSON values. Validating that invariant here prevents a
+    later database serialization failure from accidentally including claims in
+    an error or log message.
+    """
+    copied = dict(claims)
+    try:
+        encoded = json.dumps(copied, separators=(",", ":"))
+        decoded = json.loads(encoded)
+    except (TypeError, ValueError) as error:
+        raise ValueError("OIDC claims must be JSON values") from error
+    assert isinstance(decoded, dict)
+    return decoded

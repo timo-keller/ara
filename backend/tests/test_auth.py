@@ -61,6 +61,7 @@ class MockProvider(oidc.OidcClient):
             "sub": "stable-subject",
             "name": "Ada Lovelace",
             "email": "ada@example.test",
+            "groups": ["ara-lab-users"],
         }
 
 
@@ -137,6 +138,16 @@ def test_oidc_login_callback_session_and_logout(
             "email": "ada@example.test",
         },
     }
+
+    async def stored_claims() -> dict[str, Any]:
+        async with _session_factory() as session:
+            application_session = await session.get(
+                ApplicationSession, _application_session_id(client)
+            )
+            assert application_session is not None
+            return application_session.oidc_claims
+
+    assert asyncio.run(stored_claims())["groups"] == ["ara-lab-users"]
 
     logout = client.post(
         "/auth/logout", headers={auth.CSRF_HEADER: client.cookies[auth.CSRF_COOKIE]}

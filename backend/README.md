@@ -59,4 +59,9 @@ frontend must send its value in `X-CSRF-Token` for unsafe authenticated calls.
 `GET /auth/session` returns the safe local profile and `POST /auth/logout`
 revokes the session. REST handlers can use `require_authenticated_user` and
 `require_csrf` from `ara.api.routers.auth` as reusable dependencies. OIDC access and ID
-tokens are never returned to the browser or persisted by ARA.
+tokens are never returned to the browser or persisted by ARA. Validated OIDC
+claims are retained only with the server-side application session so enabled
+JMESPath role mappings can be evaluated; they are never returned by the API or
+written to request logs. `ARA_OWNER_SUBJECTS` is a comma- or newline-separated
+bootstrap Owner subject allowlist and should be supplied via
+`ARA_OWNER_SUBJECTS_FILE` in production.

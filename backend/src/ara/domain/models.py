@@ -132,6 +132,11 @@ class ApplicationSession(Base):
         UUID, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     csrf_token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Claims stay server-side with the session.  They are intentionally not
+    # related to the browser cookie or any API response.
+    oidc_claims: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict, server_default="{}"
+    )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         nullable=False,
