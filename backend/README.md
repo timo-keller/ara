@@ -28,3 +28,13 @@ tables at startup. Run pending migrations before starting the API:
 ```sh
 uv run alembic upgrade head
 ```
+
+## Health and API conventions
+
+The API and authentication route foundations are mounted at `/api` and `/auth`.
+`GET /api/health/live` checks only that the process can answer requests, while
+`GET /api/health/ready` verifies database connectivity and returns `503` when
+the database is unavailable. Every response includes an `X-Correlation-ID`
+header. Expected validation and domain failures use an `error` object with a
+safe code and message; request logs contain only request metadata and the
+correlation ID, never headers, cookies, query strings, or settings.
