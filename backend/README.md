@@ -19,3 +19,12 @@ The backend reads non-sensitive settings from environment variables:
 required secrets. In production provide each through its corresponding
 `_FILE` setting (for example, `ARA_OIDC_CLIENT_SECRET_FILE`) pointing to a
 file below `/run/secrets`. Direct and `_FILE` values cannot be set together.
+
+## Database migrations
+
+Schema changes are applied only through Alembic; the application never creates
+tables at startup. Run pending migrations before starting the API:
+
+```sh
+uv run alembic upgrade head
+```
