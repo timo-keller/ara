@@ -87,4 +87,108 @@ def test_alembic_upgrades_a_fresh_database(tmp_path: Path) -> None:
         version = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
-    assert version == ("0001_database_foundation",)
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    assert version == ("0002_core_domain_schema",)
+    assert {
+        "users",
+        "groups",
+        "role_mappings",
+        "assets",
+        "reservations",
+        "notifications",
+        "audit_events",
+    } <= tables
+
+
+def test_alembic_downgrade_and_subsequent_upgrade(tmp_path: Path) -> None:
+    database_path = tmp_path / "ara.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{database_path}")
+
+    command.upgrade(config, "head")
+    command.downgrade(config, "base")
+
+    with sqlite3.connect(database_path) as connection:
+        tables_after_downgrade = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    assert (
+        not {
+            "users",
+            "groups",
+            "role_mappings",
+            "assets",
+            "reservations",
+            "notifications",
+            "audit_events",
+        }
+        & tables_after_downgrade
+    )
+
+    command.upgrade(config, "head")
+    with sqlite3.connect(database_path) as connection:
+        version = connection.execute(
+            "SELECT version_num FROM alembic_version"
+        ).fetchone()
+    assert version == ("0002_core_domain_schema",)
+
+
+def test_core_schema_enforces_integrity_constraints(tmp_path: Path) -> None:
+    database_path = tmp_path / "ara.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{database_path}")
+    command.upgrade(config, "head")
+
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute(
+            "INSERT INTO users (id, oidc_issuer, oidc_subject) VALUES (?, ?, ?)",
+            ("user-1", "https://issuer.example", "subject-1"),
+        )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO users (id, oidc_issuer, oidc_subject) VALUES (?, ?, ?)",
+                ("user-2", "https://issuer.example", "subject-1"),
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO assets (id, group_id, asset_type, name) "
+                "VALUES (?, ?, ?, ?)",
+                ("asset-1", "missing-group", "laptop", "Laptop 1"),
+            )
+
+        connection.execute(
+            "INSERT INTO groups (id, name) VALUES (?, ?)", ("group-1", "Lab")
+        )
+        connection.execute(
+            "INSERT INTO assets (id, group_id, asset_type, name) VALUES (?, ?, ?, ?)",
+            ("asset-1", "group-1", "laptop", "Laptop 1"),
+        )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO assets (id, group_id, asset_type, name) "
+                "VALUES (?, ?, ?, ?)",
+                ("asset-2", "group-1", "laptop", "Laptop 1"),
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """INSERT INTO reservations
+                (id, asset_id, user_id, starts_at, ends_at, status)
+                VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    "reservation-1",
+                    "asset-1",
+                    "user-1",
+                    "2026-01-02 00:00:00",
+                    "2026-01-01 00:00:00",
+                    "active",
+                ),
+            )
