@@ -72,3 +72,14 @@ Only Owners can manage `/api/role-mappings`. Mappings can be created, listed,
 updated, disabled, and archived. `POST /api/role-mappings/test` evaluates an
 expression against the Owner's server-side session claims and returns only a
 boolean `matches` result; it never persists the expression or returns claims.
+
+## Assets
+
+`/api/assets` provides create, list, read, update, archive, and reactivate
+operations. Lists support `group_id`, `asset_type`, `text`, `archived`,
+`offset`, and `limit` filters and are ordered by name and identifier. Owners
+manage all assets, Group Admins manage assets in their groups, and Users see
+only active assets in their groups. Remote metadata may contain host names,
+URLs, operating-system details, and access instructions, but credential-like
+fields (including nested operational metadata) and unknown input fields are
+rejected and are never stored or returned.
