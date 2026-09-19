@@ -36,7 +36,9 @@
           label="Description"
           [value]="groupDraft().description"
           (valueChange)="changeGroup('description', $event)"
-        ></syn-textarea>
+        >
+          <span slot="help-text"><strong>Optional</strong></span>
+        </syn-textarea>
         <syn-button type="submit" variant="filled">Save group</syn-button>
       </form>
     </syn-card>

@@ -94,43 +94,64 @@
           label="Description"
           [value]="draft().description || ''"
           (valueChange)="change('description', $event)"
-        ></syn-textarea>
+        >
+          <span slot="help-text"><strong>Optional</strong></span>
+        </syn-textarea>
         <syn-input
           label="Remote host"
-          help-text="A hostname or address only; no credentials."
           [value]="draft().remote_host || ''"
           (valueChange)="change('remote_host', $event)"
-        ></syn-input>
+        >
+          <span slot="help-text"
+            ><strong>Optional</strong>. A hostname or address only; no credentials.</span
+          >
+        </syn-input>
         <syn-input
           label="Remote URL"
-          help-text="A safe link to the access service; no embedded credentials."
           [value]="draft().remote_url || ''"
           (valueChange)="change('remote_url', $event)"
-        ></syn-input>
+        >
+          <span slot="help-text"
+            ><strong>Optional</strong>. A safe link to the access service; no embedded
+            credentials.</span
+          >
+        </syn-input>
         <syn-input
           label="Operating system"
           [value]="draft().operating_system || ''"
           (valueChange)="change('operating_system', $event)"
-        ></syn-input>
+        >
+          <span slot="help-text"><strong>Optional</strong></span>
+        </syn-input>
         <syn-textarea
           label="Access instructions"
-          help-text="Describe the approved access process, without passwords, keys, tokens, or credentials."
           [value]="draft().access_instructions || ''"
           (valueChange)="change('access_instructions', $event)"
-        ></syn-textarea>
+        >
+          <span slot="help-text"
+            ><strong>Optional</strong>. Describe the approved access process, without passwords,
+            keys, tokens, or credentials.</span
+          >
+        </syn-textarea>
         <syn-textarea
           label="Operational metadata (JSON)"
-          help-text="Optional non-sensitive operational details only. Credentials are rejected."
           [value]="draft().operational_metadata_text"
           (valueChange)="change('operational_metadata_text', $event)"
-        ></syn-textarea>
+        >
+          <span slot="help-text"
+            ><strong>Optional</strong> non-sensitive operational details only. Credentials are
+            rejected.</span
+          >
+        </syn-textarea>
         <syn-combobox
           label="Webex room identifier"
-          help-text="Optional room identifier supported by the current API."
           clearable
           [value]="draft().webex_room_id || ''"
           (valueChange)="changeWebexRoomId($event)"
         >
+          <span slot="help-text"
+            ><strong>Optional</strong> room identifier supported by the current API.</span
+          >
           @for (roomId of webexRoomIdSuggestions(); track roomId) {
             <syn-option [value]="roomId">{{ roomId }}</syn-option>
           }

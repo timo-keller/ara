@@ -10,7 +10,8 @@
       label="Group"
       [value]="filters().groupId"
       (valueChange)="changeFilter('groupId', $event)"
-      ><syn-option value="">All permitted groups</syn-option>
+      ><span slot="help-text"><strong>Optional</strong></span>
+      <syn-option value="">All permitted groups</syn-option>
       @for (group of selectableGroups(); track group.id) {
         <syn-option [value]="group.id">{{ group.name }}</syn-option>
       }
@@ -19,7 +20,9 @@
       label="Actor ID"
       [value]="filters().actorId"
       (valueChange)="changeFilter('actorId', $event)"
-    ></syn-input>
+    >
+      <span slot="help-text"><strong>Optional</strong></span>
+    </syn-input>
     <syn-combobox
       label="Action"
       [value]="filters().action"
@@ -28,6 +31,7 @@
       clearable
       restricted
     >
+      <span slot="help-text"><strong>Optional</strong></span>
       @for (action of auditActions; track action) {
         <syn-option [value]="action">{{ action }}</syn-option>
       }
@@ -40,6 +44,7 @@
       clearable
       restricted
     >
+      <span slot="help-text"><strong>Optional</strong></span>
       @for (targetType of auditTargetTypes; track targetType) {
         <syn-option [value]="targetType">{{ targetType }}</syn-option>
       }
@@ -48,19 +53,25 @@
       label="Target ID"
       [value]="filters().targetId"
       (valueChange)="changeFilter('targetId', $event)"
-    ></syn-input>
+    >
+      <span slot="help-text"><strong>Optional</strong></span>
+    </syn-input>
     <syn-input
       type="datetime-local"
       label="From (local time)"
       [value]="datetimeInputValue(filters().createdAtFrom)"
       (valueChange)="changeFilter('createdAtFrom', $event)"
-    ></syn-input>
+    >
+      <span slot="help-text"><strong>Optional</strong></span>
+    </syn-input>
     <syn-input
       type="datetime-local"
       label="To (local time)"
       [value]="datetimeInputValue(filters().createdAtTo)"
       (valueChange)="changeFilter('createdAtTo', $event)"
-    ></syn-input>
+    >
+      <span slot="help-text"><strong>Optional</strong></span>
+    </syn-input>
   </form>
   @if (state() === 'loading') {
     <div class="state" aria-live="polite">

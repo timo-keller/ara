@@ -68,9 +68,13 @@
             label="End (optional)"
             type="datetime-local"
             [value]="endsAt()"
-            helpText="Leave blank only if you will return the asset manually."
             (synChangeEvent)="endsAt.set($any($event.target).value)"
-          ></syn-input>
+          >
+            <span slot="help-text"
+              ><strong>Optional</strong>. Leave blank only if you will return the asset
+              manually.</span
+            >
+          </syn-input>
           <syn-button
             type="button"
             variant="filled"

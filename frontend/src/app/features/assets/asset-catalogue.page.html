@@ -11,12 +11,15 @@
       clearable
       [value]="filters().text"
       (valueChange)="changeFilter('text', $event)"
-    ></syn-input>
+    >
+      <span slot="help-text"><strong>Optional</strong></span>
+    </syn-input>
     <syn-select
       label="Group"
       [value]="filters().groupId"
       (valueChange)="changeSelectFilter('groupId', $event)"
     >
+      <span slot="help-text"><strong>Optional</strong></span>
       <syn-option value="">All groups</syn-option>
       @for (group of groups(); track group.id) {
         <syn-option [value]="group.id">{{ group.name }}</syn-option>
@@ -24,15 +27,17 @@
     </syn-select>
     <syn-input
       label="Type"
-      help-text="Enter the exact asset type."
       [value]="filters().assetType"
       (valueChange)="changeFilter('assetType', $event)"
-    ></syn-input>
+    >
+      <span slot="help-text"><strong>Optional</strong>. Enter the exact asset type.</span>
+    </syn-input>
     <syn-select
       label="Availability"
       [value]="filters().availability"
       (valueChange)="changeSelectFilter('availability', $event)"
     >
+      <span slot="help-text"><strong>Optional</strong></span>
       <syn-option value="">All availability</syn-option
       ><syn-option value="available">Available now</syn-option
       ><syn-option value="reserved">Reserved now</syn-option>

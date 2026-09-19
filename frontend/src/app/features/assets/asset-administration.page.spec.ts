@@ -98,6 +98,32 @@ describe('AssetAdministrationPage', () => {
     );
   });
 
+  it('marks optional asset fields in help text without marking required fields', () => {
+    setRoles(true, {});
+    const fixture = createReadyPage();
+    const optionalLabels = [
+      'Description',
+      'Remote host',
+      'Remote URL',
+      'Operating system',
+      'Access instructions',
+      'Operational metadata (JSON)',
+      'Webex room identifier',
+    ];
+
+    for (const label of optionalLabels) {
+      const field = fixture.nativeElement.querySelector(`[label="${label}"]`) as HTMLElement;
+      expect(field.querySelector('[slot="help-text"] strong')?.textContent).toBe('Optional');
+    }
+    expect(
+      fixture.nativeElement.querySelector('[label="Remote host"] [slot="help-text"]')?.textContent,
+    ).toContain('no credentials');
+    for (const label of ['Group', 'Asset name', 'Asset type']) {
+      const field = fixture.nativeElement.querySelector(`[label="${label}"]`) as HTMLElement;
+      expect(field.querySelector('[slot="help-text"] strong')).toBeNull();
+    }
+  });
+
   it('selects an asset from the keyboard-accessible list and returns to a blank draft', () => {
     setRoles(true, {});
     const fixture = createReadyPage();

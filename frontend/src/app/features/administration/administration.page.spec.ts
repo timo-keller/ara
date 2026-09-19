@@ -157,6 +157,19 @@ describe('AdministrationPage', () => {
     expect(page.error()).toBe('Priority must be a whole number of zero or more.');
   });
 
+  it('marks the optional group description without marking required mapping fields', () => {
+    const fixture = createReadyPage();
+    const description = fixture.nativeElement.querySelector(
+      'syn-textarea[label="Description"]',
+    ) as HTMLElement;
+
+    expect(description.querySelector('[slot="help-text"] strong')?.textContent).toBe('Optional');
+    for (const label of ['Group name', 'Group', 'JMESPath expression', 'Role', 'Priority']) {
+      const field = fixture.nativeElement.querySelector(`[label="${label}"]`) as HTMLElement;
+      expect(field.querySelector('[slot="help-text"] strong')).toBeNull();
+    }
+  });
+
   it('sends selected integer priorities when creating and editing mappings', () => {
     const fixture = createReadyPage();
     const page = fixture.componentInstance;
