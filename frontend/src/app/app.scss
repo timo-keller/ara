@@ -45,6 +45,24 @@
   margin-top: 0;
 }
 
+@media (min-width: 641px) {
+  .appshell {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .appshell-content {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .appshell-content-inner {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .appshell-main,
   .authentication-state {

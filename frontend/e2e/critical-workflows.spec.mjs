@@ -109,3 +109,52 @@ test('group admin is scoped in the UI, API, and audit history while a user is de
   expect(auditDenied.status).toBe(403);
   await userContext.close();
 });
+
+test('Administration content scrolls without moving the desktop rail', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'e2e-owner');
+
+  for (let index = 0; index < 20; index += 1) {
+    const response = await csrfFetch(page, '/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: `Tall administration group ${index}` }),
+    });
+    expect(response.status).toBe(201);
+  }
+
+  await page.goto(`${baseURL()}/administration`);
+  await expect(page.getByRole('heading', { name: 'Group administration' })).toBeVisible();
+  await expect(
+    page.locator('.list-item strong').filter({ hasText: 'Tall administration group 19' }),
+  ).toBeVisible();
+
+  const shell = page.locator('.appshell');
+  const content = page.locator('.appshell-content-inner');
+  const rail = page.locator('syn-side-nav');
+  const logout = page.locator('syn-side-nav > syn-nav-item[slot="footer"]');
+  expect(await content.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  expect(
+    await shell.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
+  ).toBe(true);
+  const railBox = await rail.boundingBox();
+  const logoutBox = await logout.boundingBox();
+  expect(railBox).not.toBeNull();
+  expect(logoutBox).not.toBeNull();
+  expect(railBox.y + railBox.height).toBeLessThanOrEqual(720);
+  expect(logoutBox.y + logoutBox.height).toBeLessThanOrEqual(720);
+
+  await content.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  expect(await content.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  const railAfterScroll = await rail.boundingBox();
+  expect(railAfterScroll).not.toBeNull();
+  expect(railAfterScroll.y + railAfterScroll.height).toBeLessThanOrEqual(720);
+
+  await page.setViewportSize({ width: 640, height: 720 });
+  await expect(content).toHaveCSS('overflow-y', 'visible');
+  expect(
+    await shell.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
+  ).toBe(true);
+  await context.close();
+});
