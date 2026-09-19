@@ -41,3 +41,11 @@ form {
   justify-content: space-between;
   padding: 1rem 0;
 }
+
+.mapping-group + .mapping-group {
+  margin-top: 1.5rem;
+}
+
+.empty-mappings {
+  margin: 1rem 0;
+}

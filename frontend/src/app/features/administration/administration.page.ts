@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
 import { SynCardComponent } from '@synergy-design-system/angular/components/card';
@@ -30,6 +30,11 @@ interface MappingDraft {
   priority: string;
 }
 
+interface MappingGroup {
+  group: Group;
+  mappings: RoleMapping[];
+}
+
 @Component({
   imports: [
     SynAlertComponent,
@@ -49,6 +54,25 @@ export class AdministrationPage {
   private readonly administration = inject(AdministrationService);
   readonly groups = signal<Group[]>([]);
   readonly mappings = signal<RoleMapping[]>([]);
+  readonly mappingGroups = computed<MappingGroup[]>(() => {
+    const mappingsByGroup = new Map<string, RoleMapping[]>();
+    for (const mapping of this.mappings()) {
+      const mappings = mappingsByGroup.get(mapping.group_id) ?? [];
+      mappings.push(mapping);
+      mappingsByGroup.set(mapping.group_id, mappings);
+    }
+
+    return [...this.groups()]
+      .sort((left, right) => this.compareByNameAndId(left, right))
+      .map((group) => ({
+        group,
+        mappings: (mappingsByGroup.get(group.id) ?? []).sort((left, right) =>
+          left.priority === right.priority
+            ? this.compareStrings(left.id, right.id)
+            : left.priority - right.priority,
+        ),
+      }));
+  });
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   readonly error = signal<string | null>(null);
   readonly archiveConflicts = signal<ApiErrorDetail[]>([]);
@@ -181,10 +205,6 @@ export class AdministrationPage {
     });
   }
 
-  groupName(groupId: string): string {
-    return this.groups().find((group) => group.id === groupId)?.name ?? 'Unknown group';
-  }
-
   private resetGroupAndLoad(): void {
     this.groupDraft.set({ id: null, name: '', description: '' });
     this.load();
@@ -215,5 +235,13 @@ export class AdministrationPage {
 
   private apiError(error: unknown): ApiError | null {
     return error instanceof HttpErrorResponse ? (error.error as ApiError) : null;
+  }
+
+  private compareByNameAndId(left: Group, right: Group): number {
+    return this.compareStrings(left.name, right.name) || this.compareStrings(left.id, right.id);
+  }
+
+  private compareStrings(left: string, right: string): number {
+    return left < right ? -1 : left > right ? 1 : 0;
   }
 }

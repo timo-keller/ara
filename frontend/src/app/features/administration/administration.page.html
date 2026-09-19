@@ -139,28 +139,45 @@
       </section>
       <section aria-labelledby="mappings-heading">
         <h2 id="mappings-heading">Role mappings</h2>
-        @if (!mappings().length) {
-          <p>No active role mappings have been created.</p>
+        @if (!mappingGroups().length) {
+          <p>No groups have been created for role mappings.</p>
         } @else {
-          @for (mapping of mappings(); track mapping.id) {
-            <article class="list-item">
-              <div>
-                <strong>{{ groupName(mapping.group_id) }} · {{ mapping.role }}</strong>
-                <br /><code>{{ mapping.expression }}</code
-                ><br />Priority {{ mapping.priority }} ·
-                {{ mapping.enabled ? 'Enabled' : 'Disabled' }}
-              </div>
-              <div class="actions">
-                <syn-button type="button" variant="outline" (click)="editMapping(mapping)"
-                  >Edit</syn-button
-                >
-                @if (mapping.enabled) {
-                  <syn-button type="button" variant="outline" (click)="disableMapping(mapping)"
-                    >Disable</syn-button
-                  >
+          @for (mappingGroup of mappingGroups(); track mappingGroup.group.id) {
+            <section
+              class="mapping-group"
+              [attr.aria-labelledby]="'mapping-group-' + mappingGroup.group.id"
+            >
+              <h3 [id]="'mapping-group-' + mappingGroup.group.id">{{ mappingGroup.group.name }}</h3>
+              @if (!mappingGroup.mappings.length) {
+                <p class="empty-mappings" role="status">
+                  No role mappings have been created for this group.
+                </p>
+              } @else {
+                @for (mapping of mappingGroup.mappings; track mapping.id) {
+                  <article class="list-item">
+                    <div>
+                      <strong>{{ mapping.role }}</strong>
+                      <br /><code>{{ mapping.expression }}</code
+                      ><br />Priority {{ mapping.priority }} ·
+                      {{ mapping.enabled ? 'Enabled' : 'Disabled' }}
+                    </div>
+                    <div class="actions">
+                      <syn-button type="button" variant="outline" (click)="editMapping(mapping)"
+                        >Edit</syn-button
+                      >
+                      @if (mapping.enabled) {
+                        <syn-button
+                          type="button"
+                          variant="outline"
+                          (click)="disableMapping(mapping)"
+                          >Disable</syn-button
+                        >
+                      }
+                    </div>
+                  </article>
                 }
-              </div>
-            </article>
+              }
+            </section>
           }
         }
       </section>

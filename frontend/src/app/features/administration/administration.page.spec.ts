@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AdministrationPage } from './administration.page';
+import { Group, RoleMapping } from './administration.service';
 
 const group = { id: 'group-1', name: 'Lab', description: 'Test lab', archived_at: null };
 
@@ -30,14 +31,87 @@ describe('AdministrationPage', () => {
 
   afterEach(() => http.verify());
 
-  function createReadyPage() {
+  function createReadyPage(groups: Group[] = [group], mappings: RoleMapping[] = []) {
     const fixture = TestBed.createComponent(AdministrationPage);
     fixture.detectChanges();
-    http.expectOne('/api/groups?limit=100').flush({ items: [group] });
-    http.expectOne('/api/role-mappings?archived=false&limit=100').flush({ items: [] });
+    http.expectOne('/api/groups?limit=100').flush({ items: groups });
+    http.expectOne('/api/role-mappings?archived=false&limit=100').flush({ items: mappings });
     fixture.detectChanges();
     return fixture;
   }
+
+  it('groups mappings by group and orders groups and mappings deterministically', () => {
+    const groups: Group[] = [
+      { id: 'group-z', name: 'Zulu', description: null, archived_at: null },
+      { id: 'group-b', name: 'Beta', description: null, archived_at: null },
+      { id: 'group-a', name: 'Alpha', description: null, archived_at: null },
+    ];
+    const mappings: RoleMapping[] = [
+      {
+        id: 'mapping-2',
+        group_id: 'group-b',
+        expression: 'second',
+        role: 'user',
+        enabled: true,
+        priority: 1,
+        archived_at: null,
+      },
+      {
+        id: 'mapping-1',
+        group_id: 'group-b',
+        expression: 'first',
+        role: 'group_admin',
+        enabled: true,
+        priority: 1,
+        archived_at: null,
+      },
+      {
+        id: 'mapping-3',
+        group_id: 'group-b',
+        expression: 'last',
+        role: 'user',
+        enabled: false,
+        priority: 2,
+        archived_at: null,
+      },
+      {
+        id: 'mapping-4',
+        group_id: 'group-a',
+        expression: 'alpha',
+        role: 'user',
+        enabled: true,
+        priority: 0,
+        archived_at: null,
+      },
+    ];
+    const fixture = createReadyPage(groups, mappings);
+    const mappingGroups = Array.from(
+      fixture.nativeElement.querySelectorAll('.mapping-group'),
+    ) as HTMLElement[];
+
+    expect(
+      mappingGroups.map((section) => section.querySelector('h3')?.textContent?.trim()),
+    ).toEqual(['Alpha', 'Beta', 'Zulu']);
+    expect(
+      Array.from(mappingGroups[1].querySelectorAll('code')).map((item) => item.textContent),
+    ).toEqual(['first', 'second', 'last']);
+    expect(mappingGroups[1].textContent).toContain('Disabled');
+    expect(mappingGroups[1].querySelectorAll('syn-button').length).toBe(5);
+
+    const betaButtons = Array.from(
+      mappingGroups[1].querySelectorAll('syn-button'),
+    ) as HTMLElement[];
+    betaButtons[0].dispatchEvent(new Event('click'));
+    expect(fixture.componentInstance.mappingDraft().id).toBe('mapping-1');
+    betaButtons[1].dispatchEvent(new Event('click'));
+    const disable = http.expectOne('/api/role-mappings/mapping-1/disable');
+    expect(disable.request.method).toBe('POST');
+
+    const emptyGroup = mappingGroups[2];
+    expect(emptyGroup.querySelector('[role="status"]')?.textContent).toContain(
+      'No role mappings have been created for this group',
+    );
+  });
 
   it('creates groups and sends mapping tests only to the non-persisting test endpoint', () => {
     const fixture = createReadyPage();
