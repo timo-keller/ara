@@ -1,0 +1,58 @@
+.appshell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.appshell-content {
+  background: var(--syn-page-background-color-muted);
+  display: flex;
+  flex: 1 0 auto;
+  min-height: 0;
+  position: relative;
+}
+
+.appshell-content-inner {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.appshell-main,
+.authentication-state {
+  background: var(--syn-color-neutral-0);
+  border-radius: var(--syn-border-radius-medium);
+  margin: var(--syn-spacing-2x-large);
+  padding: var(--syn-spacing-2x-large);
+}
+
+.appshell-main {
+  flex: 1 0 auto;
+}
+
+.authentication-state {
+  margin: var(--syn-spacing-2x-large) auto;
+  max-width: 36rem;
+}
+
+.account-name,
+.effective-roles {
+  font: var(--syn-body-small);
+}
+
+.effective-roles {
+  margin-top: 0;
+}
+
+@media (max-width: 640px) {
+  .appshell-main,
+  .authentication-state {
+    margin: var(--syn-spacing-medium);
+    padding: var(--syn-spacing-large);
+  }
+
+  syn-side-nav {
+    --side-nav-open-width: 306px;
+  }
+}

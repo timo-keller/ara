@@ -18,6 +18,12 @@ npm run build:production
 `/api` and `/auth` paths; deployment infrastructure routes them to the backend
 and identity provider. No environment-specific frontend origin is configured.
 
+Authentication uses the same-origin `/auth/session`, `/auth/login`, and
+`/auth/logout` endpoints. The session response contains server-resolved effective
+roles, which control visible navigation only; the API remains authoritative.
+Unsafe same-origin requests send the `ara_csrf` double-submit cookie as
+`X-CSRF-Token`.
+
 ## Synergy Design System
 
 The frontend uses the Synergy 2025 light theme globally. Its SICK Intl fonts

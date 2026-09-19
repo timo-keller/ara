@@ -137,6 +137,7 @@ def test_oidc_login_callback_session_and_logout(
             "display_name": "Ada Lovelace",
             "email": "ada@example.test",
         },
+        "roles": {"is_owner": False, "group_roles": {}},
     }
 
     async def stored_claims() -> dict[str, Any]:

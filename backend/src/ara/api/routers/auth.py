@@ -14,7 +14,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.api.routers import auth_router
-from ara.api.schemas.auth import SessionSchema, SessionUserSchema
+from ara.api.schemas.auth import EffectiveRolesSchema, SessionSchema, SessionUserSchema
 from ara.core.config import get_settings
 from ara.core.errors import DomainError
 from ara.domain.models import ApplicationSession, User
@@ -25,6 +25,7 @@ from ara.services.auth import (
     AuthenticationService,
     csrf_token_hash,
 )
+from ara.services.authorization import RoleResolutionService
 from ara.services.oidc import STATE_TTL_SECONDS, OidcLoginService
 
 STATE_COOKIE, SESSION_COOKIE, CSRF_COOKIE, CSRF_HEADER = (
@@ -231,10 +232,20 @@ async def current_session(
     except DomainError:
         return SessionSchema(authenticated=False)
     user = application_session.user
+    roles = await RoleResolutionService(
+        session, get_settings().owner_subjects.get_secret_value()
+    ).resolve_session(application_session)
     return SessionSchema(
         authenticated=True,
         user=SessionUserSchema(
             id=str(user.id), display_name=user.display_name, email=user.email
+        ),
+        roles=EffectiveRolesSchema(
+            is_owner=roles.is_owner,
+            group_roles={
+                str(group_id): role.value
+                for group_id, role in roles.group_roles.items()
+            },
         ),
     )
 

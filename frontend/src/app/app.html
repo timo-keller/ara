@@ -1,3 +1,83 @@
-<main>
-  <router-outlet />
-</main>
+@if (auth.state() === 'loading') {
+  <main class="authentication-state" aria-live="polite">
+    <h1>Signing in</h1>
+    <p>Checking your session…</p>
+  </main>
+} @else if (auth.state() === 'authenticated') {
+  <div class="appshell">
+    <syn-header label="ARA">
+      <nav slot="meta-navigation" aria-label="Account">
+        <span class="account-name">{{ auth.user()?.display_name || auth.user()?.email }}</span>
+      </nav>
+    </syn-header>
+    <div class="appshell-content">
+      <syn-side-nav variant="rail" aria-label="Main navigation">
+        <syn-nav-item
+          [attr.current]="isCurrent('/') ? '' : null"
+          href="/"
+          (click)="navigate('/', $event)"
+        >
+          <syn-icon aria-hidden="true" library="ara" name="home" slot="prefix"></syn-icon>
+          Home
+        </syn-nav-item>
+        <syn-nav-item
+          [attr.current]="isCurrent('/reservations') ? '' : null"
+          divider
+          href="/reservations"
+          (click)="navigate('/reservations', $event)"
+        >
+          <syn-icon aria-hidden="true" library="ara" name="calendar_today" slot="prefix"></syn-icon>
+          Reservations
+        </syn-nav-item>
+        @if (auth.hasGroupAccess()) {
+          <syn-nav-item
+            [attr.current]="isCurrent('/assets') ? '' : null"
+            divider
+            href="/assets"
+            (click)="navigate('/assets', $event)"
+          >
+            <syn-icon aria-hidden="true" library="ara" name="inventory" slot="prefix"></syn-icon>
+            Assets
+          </syn-nav-item>
+        }
+        @if (auth.roles()?.is_owner) {
+          <syn-nav-item
+            [attr.current]="isCurrent('/administration') ? '' : null"
+            divider
+            href="/administration"
+            (click)="navigate('/administration', $event)"
+          >
+            <syn-icon aria-hidden="true" library="ara" name="settings" slot="prefix"></syn-icon>
+            Administration
+          </syn-nav-item>
+        }
+        <syn-nav-item slot="footer" divider href="/" (click)="logout($event)">
+          <syn-icon aria-hidden="true" library="ara" name="logout" slot="prefix"></syn-icon>
+          Log out
+        </syn-nav-item>
+      </syn-side-nav>
+      <div class="appshell-content-inner">
+        <main class="appshell-main" tabindex="-1">
+          <p class="effective-roles">
+            <strong>Effective roles:</strong> {{ roleLabels().join(', ') || 'No group roles' }}
+          </p>
+          <router-outlet />
+        </main>
+      </div>
+    </div>
+  </div>
+} @else {
+  <main class="authentication-state" aria-live="polite">
+    @if (auth.state() === 'expired') {
+      <h1>Your session has expired</h1>
+      <p>Sign in again to continue safely.</p>
+    } @else if (auth.state() === 'error') {
+      <h1>Unable to check your session</h1>
+      <p>Please try signing in again. If the problem continues, contact support.</p>
+    } @else {
+      <h1>Welcome to ARA</h1>
+      <p>Sign in to manage asset reservations and allocations.</p>
+    }
+    <syn-button type="button" (click)="auth.login()">Sign in</syn-button>
+  </main>
+}
