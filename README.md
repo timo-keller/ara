@@ -40,9 +40,11 @@ uv run pytest
 # Frontend
 cd frontend
 npm install
+npm run format:check
 npm run lint
 npm test
-npm run build
+npm run build:development
+npm run build:production
 
 # Complete deployment (from the repository root)
 docker compose config
