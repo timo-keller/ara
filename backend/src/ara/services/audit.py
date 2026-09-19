@@ -1,5 +1,6 @@
 """Service-layer audit staging with deliberately small state snapshots."""
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,6 +26,15 @@ class AuditContext:
 
     actor_id: uuid.UUID | None = None
     correlation_id: str | None = None
+
+
+@dataclass(frozen=True)
+class AuditRetentionResult:
+    """Metrics emitted by one bounded audit retention cleanup run."""
+
+    deleted_count: int
+    batches: int
+    cutoff: datetime
 
 
 def _time(value: datetime | None) -> str | None:
@@ -172,3 +182,36 @@ class AuditService:
             and created_at_from > created_at_to
         ):
             raise ValueError("created_at_from must be before or equal to created_at_to")
+
+
+class AuditRetentionService:
+    """Remove expired audit rows without recording audit events of its own."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.events = AuditDAO(session)
+        self.session = session
+
+    async def delete_expired_events(
+        self, *, cutoff: datetime, batch_size: int
+    ) -> AuditRetentionResult:
+        """Delete events before ``cutoff``, committing each bounded batch.
+
+        The cutoff is exclusive: events created at the cutoff remain retained.
+        Yielding after commits gives other SQLite work an opportunity to run
+        during a large cleanup.
+        """
+        if batch_size <= 0:
+            raise ValueError("batch_size must be greater than zero")
+        AuditService._validate_time_range(cutoff, None)
+
+        deleted_count = 0
+        batches = 0
+        while deleted := await self.events.delete_events_before(cutoff, batch_size):
+            await self.session.commit()
+            deleted_count += deleted
+            batches += 1
+            await asyncio.sleep(0)
+
+        return AuditRetentionResult(
+            deleted_count=deleted_count, batches=batches, cutoff=cutoff
+        )

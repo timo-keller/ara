@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import AuditEvent
@@ -18,6 +18,27 @@ class AuditDAO:
     def add(self, event: AuditEvent) -> None:
         """Stage an event in the caller's transaction."""
         self.session.add(event)
+
+    async def delete_events_before(self, cutoff: datetime, batch_size: int) -> int:
+        """Delete at most ``batch_size`` events strictly older than ``cutoff``.
+
+        The caller owns the transaction so retention cleanup can commit each
+        bounded batch independently.
+        """
+        event_ids = list(
+            await self.session.scalars(
+                select(AuditEvent.id)
+                .where(AuditEvent.created_at < cutoff)
+                .order_by(AuditEvent.created_at, AuditEvent.id)
+                .limit(batch_size)
+            )
+        )
+        if not event_ids:
+            return 0
+        await self.session.execute(
+            delete(AuditEvent).where(AuditEvent.id.in_(event_ids))
+        )
+        return len(event_ids)
 
     async def list_events(
         self,

@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
@@ -22,6 +23,9 @@ SCHEDULER_JOB_DEFAULTS = {
 scheduler_logger = logging.getLogger("ara.scheduler")
 RESERVATION_REMINDER_JOB_ID = "reservation-reminders"
 RESERVATION_REMINDER_INTERVAL_SECONDS = 60
+AUDIT_RETENTION_JOB_ID = "audit-retention"
+AUDIT_RETENTION_INTERVAL_DAYS = 1
+AUDIT_RETENTION_BATCH_SIZE = 100
 
 
 def create_scheduler() -> AsyncIOScheduler:
@@ -62,6 +66,47 @@ def register_reservation_reminder_job(scheduler: AsyncIOScheduler) -> None:
     )
 
 
+async def cleanup_expired_audit_events(session: AsyncSession) -> int:
+    """Remove expired audit events and emit cleanup metrics."""
+    from ara.core.config import get_settings
+    from ara.services.audit import AuditRetentionService
+
+    cutoff = datetime.now(UTC) - timedelta(days=get_settings().audit_retention_days)
+    result = await AuditRetentionService(session).delete_expired_events(
+        cutoff=cutoff, batch_size=AUDIT_RETENTION_BATCH_SIZE
+    )
+    scheduler_logger.info(
+        json.dumps(
+            {
+                "event": "audit_retention_cleanup_completed",
+                "deleted_count": result.deleted_count,
+                "batches": result.batches,
+                "cutoff": result.cutoff.isoformat(),
+            }
+        )
+    )
+    return result.deleted_count
+
+
+async def run_audit_retention_job() -> int:
+    """Scheduler entry point; use a session independent from requests."""
+    return await run_scheduled_job(AUDIT_RETENTION_JOB_ID, cleanup_expired_audit_events)
+
+
+def register_audit_retention_job(scheduler: AsyncIOScheduler) -> None:
+    """Register the daily singleton audit retention cleanup job."""
+    for job in scheduler.get_jobs():
+        if job.id == AUDIT_RETENTION_JOB_ID:
+            scheduler.remove_job(job.id)
+    scheduler.add_job(
+        run_audit_retention_job,
+        "interval",
+        days=AUDIT_RETENTION_INTERVAL_DAYS,
+        id=AUDIT_RETENTION_JOB_ID,
+        replace_existing=True,
+    )
+
+
 async def run_scheduled_job[JobResult](
     job_id: str,
     job: Callable[[AsyncSession], Awaitable[JobResult]],
@@ -93,6 +138,7 @@ async def scheduler_lifespan(app: FastAPI):
     """Start one scheduler for this app process and stop it gracefully."""
     scheduler = create_scheduler()
     register_reservation_reminder_job(scheduler)
+    register_audit_retention_job(scheduler)
     app.state.scheduler = scheduler
     scheduler.start()
     try:

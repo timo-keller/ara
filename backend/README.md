@@ -48,6 +48,11 @@ ended reservations are excluded. The database uniqueness key
 `(reservation_id, kind, scheduled_for)` (where kind includes the offset) makes
 repeated runs idempotent.
 
+Audit retention runs daily. It deletes events strictly older than
+`ARA_AUDIT_RETENTION_DAYS` in independently committed batches of 100; events
+created exactly at the calculated UTC cutoff remain. Each run logs its deleted
+event count, batch count, and cutoff as structured metrics.
+
 `GET /api/notifications` returns only the authenticated user's notifications,
 paginated with `offset` and `limit`, newest-first by `created_at` with `id` as
 the tie-breaker. `POST /api/notifications/{id}/read` requires CSRF protection,
