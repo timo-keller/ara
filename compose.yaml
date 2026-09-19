@@ -1,2 +1,62 @@
-# Docker Compose deployment configuration will be added here.
-# Keep deployment-specific supporting configuration under deployment/.
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      ARA_PUBLIC_URL: ${ARA_PUBLIC_URL:-https://localhost}
+      ARA_OIDC_ISSUER_URL: ${ARA_OIDC_ISSUER_URL:-https://issuer.example.invalid}
+      ARA_OIDC_CLIENT_ID: ${ARA_OIDC_CLIENT_ID:-ara}
+      ARA_OIDC_SCOPES: ${ARA_OIDC_SCOPES:-openid profile email}
+      ARA_AUDIT_RETENTION_DAYS: ${ARA_AUDIT_RETENTION_DAYS:-365}
+      ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES: ${ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES:-60 15 0}
+      ARA_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+      ARA_SESSION_SECRET_FILE: /run/secrets/session_secret
+      ARA_OWNER_SUBJECTS_FILE: /run/secrets/owner_subjects
+    volumes:
+      - ${ARA_DATA_DIR:-./data}:/app/data:rw
+    secrets:
+      - oidc_client_secret
+      - session_secret
+      - owner_subjects
+    networks:
+      - application
+      - backend_egress
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    stop_grace_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      CADDY_CERT_FILE: ${CADDY_CERT_FILE:-tls.crt}
+      CADDY_KEY_FILE: ${CADDY_KEY_FILE:-tls.key}
+    ports:
+      - ${ARA_HTTPS_PORT:-443}:443
+    volumes:
+      - ${ARA_CERTIFICATE_DIR:-./certificates}:/certificates:ro
+    networks:
+      - application
+      - web_ingress
+
+networks:
+  application:
+    internal: true
+  # The API needs outbound access to its configured OIDC issuer.  This network
+  # has no published ports and the web service is deliberately not attached.
+  backend_egress: {}
+  # Caddy needs a non-internal attachment for Docker's published-port routing;
+  # it remains connected to the internal application network for the API.
+  web_ingress: {}
+
+secrets:
+  oidc_client_secret:
+    file: ${ARA_OIDC_CLIENT_SECRET_FILE:-./secrets/oidc_client_secret}
+  session_secret:
+    file: ${ARA_SESSION_SECRET_FILE:-./secrets/session_secret}
+  owner_subjects:
+    file: ${ARA_OWNER_SUBJECTS_FILE:-./secrets/owner_subjects}
