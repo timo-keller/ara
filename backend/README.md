@@ -83,3 +83,12 @@ only active assets in their groups. Remote metadata may contain host names,
 URLs, operating-system details, and access instructions, but credential-like
 fields (including nested operational metadata) and unknown input fields are
 rejected and are never stored or returned.
+
+## Reservation intervals
+
+Reservation timestamps must be timezone-aware UTC values. Active reservations
+use exclusive intervals: adjacent intervals are allowed, while an omitted end
+is positive infinity. Conflict checking and insertion run in one SQLite
+`BEGIN IMMEDIATE` write transaction. This relies on the documented single
+backend-process deployment model; SQLite does not provide a range exclusion
+constraint for multi-process deployments.
