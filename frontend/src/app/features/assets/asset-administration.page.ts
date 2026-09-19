@@ -80,6 +80,16 @@ export class AssetAdministrationPage {
     }
     return [...suggestions.values()];
   });
+  readonly webexRoomIdSuggestions = computed(() => {
+    const groupId = this.draft().group_id;
+    const suggestions = new Map<string, string>();
+    for (const asset of this.manageableAssets()) {
+      if (asset.group_id !== groupId) continue;
+      const roomId = asset.webex_room_id?.trim();
+      if (roomId && !suggestions.has(roomId)) suggestions.set(roomId, roomId);
+    }
+    return [...suggestions.values()];
+  });
 
   constructor() {
     this.load();
@@ -117,6 +127,10 @@ export class AssetAdministrationPage {
 
   changeAssetType(value: string | number | (string | number)[]): void {
     this.change('asset_type', Array.isArray(value) ? String(value[0] ?? '') : String(value));
+  }
+
+  changeWebexRoomId(value: string | number | (string | number)[]): void {
+    this.change('webex_room_id', Array.isArray(value) ? String(value[0] ?? '') : String(value));
   }
 
   edit(asset: Asset): void {

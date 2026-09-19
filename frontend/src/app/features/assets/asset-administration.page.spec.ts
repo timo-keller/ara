@@ -146,6 +146,34 @@ describe('AssetAdministrationPage', () => {
     expect(fixture.nativeElement.querySelector('syn-combobox')).not.toBeNull();
   });
 
+  it('suggests unique non-empty Webex room identifiers for the selected manageable group', () => {
+    setRoles(false, { 'group-admin': 'group_admin', 'group-user': 'user' });
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.assets.set([
+      { ...activeAsset, webex_room_id: ' room-admin ' },
+      { ...activeAsset, id: 'asset-duplicate', webex_room_id: 'room-admin' },
+      {
+        ...activeAsset,
+        id: 'asset-archived-room',
+        archived_at: '2026-01-01',
+        webex_room_id: 'room-archived',
+      },
+      { ...activeAsset, id: 'asset-empty', webex_room_id: '  ' },
+      { ...activeAsset, id: 'asset-null', webex_room_id: null },
+      { ...activeAsset, id: 'asset-user', group_id: 'group-user', webex_room_id: 'room-user' },
+    ]);
+
+    page.changeGroup('group-admin');
+    expect(page.webexRoomIdSuggestions()).toEqual(['room-admin', 'room-archived']);
+    page.changeGroup('group-user');
+    expect(page.webexRoomIdSuggestions()).toEqual([]);
+    page.edit({ ...activeAsset, webex_room_id: 'room-admin' });
+    expect(page.webexRoomIdSuggestions()).toEqual(['room-admin', 'room-archived']);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('syn-combobox syn-option')).toHaveLength(3);
+  });
+
   it('creates, edits, archives, and reactivates using the asset API contract', () => {
     setRoles(true, {});
     const fixture = createReadyPage();
@@ -154,7 +182,7 @@ describe('AssetAdministrationPage', () => {
     page.change('name', 'New laptop');
     page.changeAssetType('New custom type');
     page.change('remote_host', 'remote.example.test');
-    page.change('webex_room_id', 'room-42');
+    page.changeWebexRoomId('room-42');
     page.change('operational_metadata_text', '{"location":"Lab A"}');
     page.save();
     const create = http.expectOne('/api/assets');
@@ -178,11 +206,13 @@ describe('AssetAdministrationPage', () => {
 
     page.edit(activeAsset);
     page.change('name', 'Updated laptop');
+    page.changeWebexRoomId('  ');
     page.save();
     const update = http.expectOne('/api/assets/asset-active');
     expect(update.request.method).toBe('PATCH');
     expect(update.request.body.group_id).toBeUndefined();
     expect(update.request.body.name).toBe('Updated laptop');
+    expect(update.request.body.webex_room_id).toBeNull();
     update.flush(activeAsset);
     http.expectOne('/api/groups?archived=false&limit=100').flush({ items: groups });
     http.expectOne('/api/assets?archived=false&limit=100').flush({ items: [activeAsset] });

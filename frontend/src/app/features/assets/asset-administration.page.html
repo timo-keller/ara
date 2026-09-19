@@ -78,12 +78,17 @@
         [value]="draft().operational_metadata_text"
         (valueChange)="change('operational_metadata_text', $event)"
       ></syn-textarea>
-      <syn-input
+      <syn-combobox
         label="Webex room identifier"
         help-text="Optional room identifier supported by the current API."
+        clearable
         [value]="draft().webex_room_id || ''"
-        (valueChange)="change('webex_room_id', $event)"
-      ></syn-input>
+        (valueChange)="changeWebexRoomId($event)"
+      >
+        @for (roomId of webexRoomIdSuggestions(); track roomId) {
+          <syn-option [value]="roomId">{{ roomId }}</syn-option>
+        }
+      </syn-combobox>
       <syn-button type="submit" variant="filled">{{
         draft().id ? 'Save asset' : 'Create asset'
       }}</syn-button>
