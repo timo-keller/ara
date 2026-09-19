@@ -1,0 +1,61 @@
+<syn-dropdown placement="bottom-end" stayOpenOnSelect>
+  <syn-button slot="trigger" type="button" variant="text">
+    Notifications
+    @if (notifications.unreadCount() > 0) {
+      <syn-badge variant="primary">{{ notifications.unreadCount() }}</syn-badge>
+    }
+  </syn-button>
+  <section class="notification-panel" aria-label="Notifications" aria-live="polite">
+    <div class="notification-actions">
+      <strong>Notifications</strong>
+      <syn-button type="button" size="small" variant="text" (click)="notifications.refresh()">
+        Refresh
+      </syn-button>
+    </div>
+    @if (notifications.unreadCount() > 0) {
+      <syn-button type="button" size="small" variant="text" (click)="notifications.markAllRead()">
+        Mark all read
+      </syn-button>
+    }
+    @if (notifications.browserPermission() === 'default') {
+      <syn-button
+        type="button"
+        size="small"
+        variant="text"
+        (click)="notifications.requestBrowserPermission()"
+      >
+        Enable browser notifications
+      </syn-button>
+    }
+    @if (notifications.error()) {
+      <p class="notification-error" role="status">Notifications could not be refreshed.</p>
+    }
+    @if (notifications.notifications().length === 0 && !notifications.loading()) {
+      <p>No notifications.</p>
+    } @else {
+      <ul class="notification-list">
+        @for (notification of notifications.notifications(); track notification.id) {
+          <li [class.unread]="notification.read_at === null">
+            <strong>{{ notification.title }}</strong>
+            @if (notification.body) {
+              <p>{{ notification.body }}</p>
+            }
+            <time [attr.datetime]="notification.created_at">{{
+              notification.created_at | date: 'medium'
+            }}</time>
+            @if (notification.read_at === null) {
+              <syn-button
+                type="button"
+                size="small"
+                variant="text"
+                (click)="notifications.markRead(notification)"
+              >
+                Mark read
+              </syn-button>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</syn-dropdown>

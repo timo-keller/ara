@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import Notification, Reservation, ReservationStatus
@@ -39,6 +39,16 @@ class NotificationDAO:
             select(Notification).where(
                 Notification.id == notification_id, Notification.user_id == user_id
             )
+        )
+
+    async def mark_all_read_for_user(
+        self, *, user_id: uuid.UUID, read_at: datetime
+    ) -> None:
+        """Mark the user's unread notifications read in one bounded statement."""
+        await self.session.execute(
+            update(Notification)
+            .where(Notification.user_id == user_id, Notification.read_at.is_(None))
+            .values(read_at=read_at)
         )
 
     async def due_reservations(self, *, due_before: datetime) -> list[Reservation]:

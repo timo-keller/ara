@@ -41,6 +41,13 @@ class NotificationService:
             await self.session.commit()
         return notification
 
+    async def mark_all_read(self, *, user_id: uuid.UUID) -> None:
+        """Mark all of the current user's notifications read idempotently."""
+        await self.notifications.mark_all_read_for_user(
+            user_id=user_id, read_at=utc_now()
+        )
+        await self.session.commit()
+
     async def generate_due_reminders(self, offsets_minutes: tuple[int, ...]) -> int:
         """Persist every due reminder, including ones missed while the process was down.
 

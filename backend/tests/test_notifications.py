@@ -115,6 +115,10 @@ async def test_reminders_are_idempotent_catch_up_and_exclude_terminal_reservatio
         assert await service.generate_due_reminders((60, 15, 0)) == 0
         notifications = list(await session.scalars(select(Notification)))
         assert len(notifications) == 3
+        assert all(
+            notification.reservation_id != reservations[1].id
+            for notification in notifications
+        )
     await engine.dispose()
 
 
@@ -145,3 +149,9 @@ def test_notifications_are_private_paginated_and_read_idempotently(
     assert first_read.status_code == 200
     read_at = first_read.json()["read_at"]
     assert client.post(f"/api/notifications/{own.id}/read").json()["read_at"] == read_at
+
+    mark_all = client.post("/api/notifications/read")
+    assert mark_all.status_code == 204
+    assert client.post("/api/notifications/read").status_code == 204
+    all_read = client.get("/api/notifications").json()["items"]
+    assert all(notification["read_at"] is not None for notification in all_read)

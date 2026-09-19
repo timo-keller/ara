@@ -49,3 +49,12 @@ async def mark_notification_read(
         user_id=user.id, notification_id=notification_id
     )
     return _notification_schema(notification)
+
+
+@api_router.post("/notifications/read", status_code=204)
+async def mark_all_notifications_read(
+    user: Annotated[User, Depends(require_authenticated_user)],
+    _csrf: Annotated[None, Depends(require_csrf)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> None:
+    await NotificationService(session).mark_all_read(user_id=user.id)

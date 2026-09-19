@@ -7,6 +7,7 @@ import { SynNavItemComponent } from '@synergy-design-system/angular/components/n
 import { SynSideNavComponent } from '@synergy-design-system/angular/components/side-nav';
 import { filter } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
+import { NotificationComponent } from './core/notifications/notification.component';
 
 @Component({
   imports: [
@@ -15,6 +16,7 @@ import { AuthService } from './core/auth/auth.service';
     SynHeaderComponent,
     SynIconComponent,
     SynNavItemComponent,
+    NotificationComponent,
     SynSideNavComponent,
   ],
   selector: 'app-root',
