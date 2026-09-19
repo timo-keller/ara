@@ -16,11 +16,13 @@ import { AssetAdministrationService, AssetDraftPayload } from './asset-administr
 
 interface AssetDraft extends AssetDraftPayload {
   id: string | null;
+  archived_at: string | null;
   operational_metadata_text: string;
 }
 
 const emptyDraft = (): AssetDraft => ({
   id: null,
+  archived_at: null,
   group_id: '',
   asset_type: '',
   name: '',
@@ -95,7 +97,7 @@ export class AssetAdministrationPage {
     this.load();
   }
 
-  load(): void {
+  load(selectedAssetId: string | null = this.draft().id): void {
     this.state.set('loading');
     this.error.set(null);
     this.administration.groups().subscribe({
@@ -106,6 +108,13 @@ export class AssetAdministrationPage {
             this.administration.list(true).subscribe({
               next: ({ items: archived }) => {
                 this.assets.set([...active, ...archived]);
+                if (selectedAssetId) {
+                  const selected = this.manageableAssets().find(
+                    (asset) => asset.id === selectedAssetId,
+                  );
+                  if (selected) this.edit(selected);
+                  else this.createAsset();
+                }
                 this.state.set('ready');
               },
               error: (error) => this.loadError(error),
@@ -143,6 +152,11 @@ export class AssetAdministrationPage {
     });
   }
 
+  createAsset(): void {
+    this.error.set(null);
+    this.draft.set(emptyDraft());
+  }
+
   save(): void {
     const draft = this.draft();
     if (!draft.name?.trim() || !draft.asset_type?.trim() || (!draft.id && !draft.group_id)) {
@@ -165,26 +179,37 @@ export class AssetAdministrationPage {
       ? this.administration.update(draft.id, this.withoutGroup(payload))
       : this.administration.create(payload);
     request.subscribe({
-      next: () => {
-        this.draft.set(emptyDraft());
-        this.load();
+      next: (asset) => {
+        this.load(asset.id);
       },
       error: (error) => this.showApiError(error),
     });
   }
 
-  archive(asset: Asset): void {
+  archive(asset: Pick<Asset, 'id'>): void {
     this.administration.archive(asset.id).subscribe({
-      next: () => this.load(),
+      // Archived assets remain visible, so retaining this selection makes the
+      // resulting state explicit and lets the administrator reactivate it.
+      next: () => this.load(asset.id),
       error: (error) => this.showApiError(error),
     });
   }
 
-  reactivate(asset: Asset): void {
+  archiveSelected(): void {
+    const assetId = this.draft().id;
+    if (assetId) this.archive({ id: assetId });
+  }
+
+  reactivate(asset: Pick<Asset, 'id'>): void {
     this.administration.reactivate(asset.id).subscribe({
-      next: () => this.load(),
+      next: () => this.load(asset.id),
       error: (error) => this.showApiError(error),
     });
+  }
+
+  reactivateSelected(): void {
+    const assetId = this.draft().id;
+    if (assetId) this.reactivate({ id: assetId });
   }
 
   groupName(groupId: string): string {

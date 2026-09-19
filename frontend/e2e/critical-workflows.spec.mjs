@@ -110,6 +110,46 @@ test('group admin is scoped in the UI, API, and audit history while a user is de
   await userContext.close();
 });
 
+test('asset administration provides a keyboard-selectable responsive master-detail editor', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'alpha-admin');
+  await page.goto(`${baseURL()}/asset-administration`);
+
+  const workspace = page.locator('.asset-workspace');
+  const asset = page.getByRole('button', { name: 'Edit Alpha Laptop' });
+  expect(
+    await workspace.evaluate(
+      (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(2);
+  await asset.focus();
+  await asset.press('Enter');
+  await expect(page.getByText('Editing Alpha Laptop')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Alpha Laptop, selected' })).toHaveAttribute(
+    'aria-current',
+    'true',
+  );
+
+  await page.getByRole('button', { name: 'Create asset', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Create asset' }).last()).toBeVisible();
+  await expect(page.locator('.asset-list-item[aria-current="true"]')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 640, height: 720 });
+  expect(
+    await workspace.evaluate(
+      (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Managed assets' })).toBeVisible();
+  await expect(
+    page.locator('.list-heading').getByRole('button', { name: 'Create asset', exact: true }),
+  ).toBeVisible();
+  await context.close();
+});
+
 test('Administration content scrolls without moving the desktop rail', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();

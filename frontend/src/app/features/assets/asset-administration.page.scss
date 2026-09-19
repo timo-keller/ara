@@ -1,6 +1,24 @@
 syn-card {
   display: block;
+}
+.asset-workspace {
+  align-items: start;
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.6fr);
   margin: 1.5rem 0;
+}
+.asset-list-pane {
+  min-width: 0;
+}
+.list-heading {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+.list-heading h2 {
+  margin: 0;
 }
 form {
   display: flex;
@@ -13,16 +31,42 @@ form {
   gap: 0.75rem;
   margin: 2rem 0;
 }
-.asset-list article {
-  align-items: center;
+.asset-list {
   border-top: 1px solid var(--syn-color-neutral-300);
+  margin-top: 1rem;
+}
+.asset-list-item {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--syn-color-neutral-300);
+  color: inherit;
+  cursor: pointer;
   display: flex;
+  flex-direction: column;
   gap: 1rem;
-  justify-content: space-between;
+  text-align: left;
+  width: 100%;
   padding: 1rem 0;
 }
-.actions {
+.asset-list-item:hover,
+.asset-list-item.selected {
+  background: var(--syn-color-neutral-100);
+}
+.asset-list-item:focus-visible {
+  outline: 3px solid var(--syn-color-primary-600);
+  outline-offset: -3px;
+}
+.badges {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+.selected-asset {
+  font-weight: 600;
+}
+
+@media (max-width: 48rem) {
+  .asset-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

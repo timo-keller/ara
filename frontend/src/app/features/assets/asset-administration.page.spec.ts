@@ -98,6 +98,28 @@ describe('AssetAdministrationPage', () => {
     );
   });
 
+  it('selects an asset from the keyboard-accessible list and returns to a blank draft', () => {
+    setRoles(true, {});
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    const assetButton = fixture.nativeElement.querySelector(
+      'button[aria-label="Edit Build laptop"]',
+    ) as HTMLButtonElement;
+
+    expect(assetButton).not.toBeNull();
+    assetButton.click();
+    fixture.detectChanges();
+    expect(page.draft().id).toBe('asset-active');
+    expect(page.draft().name).toBe('Build laptop');
+    expect(assetButton.getAttribute('aria-current')).toBe('true');
+    expect(fixture.nativeElement.textContent).toContain('Editing Build laptop');
+
+    page.createAsset();
+    fixture.detectChanges();
+    expect(page.draft().id).toBeNull();
+    expect(fixture.nativeElement.querySelector('[aria-current="true"]')).toBeNull();
+  });
+
   it('suggests normalized asset types only from the selected manageable group', () => {
     setRoles(true, {});
     const fixture = createReadyPage();
@@ -203,6 +225,7 @@ describe('AssetAdministrationPage', () => {
     http.expectOne('/api/groups?archived=false&limit=100').flush({ items: groups });
     http.expectOne('/api/assets?archived=false&limit=100').flush({ items: [activeAsset] });
     http.expectOne('/api/assets?archived=true&limit=100').flush({ items: [] });
+    expect(page.draft().id).toBe('asset-active');
 
     page.edit(activeAsset);
     page.change('name', 'Updated laptop');
@@ -224,7 +247,11 @@ describe('AssetAdministrationPage', () => {
     archive.flush(activeAsset);
     http.expectOne('/api/groups?archived=false&limit=100').flush({ items: groups });
     http.expectOne('/api/assets?archived=false&limit=100').flush({ items: [] });
-    http.expectOne('/api/assets?archived=true&limit=100').flush({ items: [activeAsset] });
+    http.expectOne('/api/assets?archived=true&limit=100').flush({
+      items: [{ ...activeAsset, archived_at: '2026-01-01' }],
+    });
+    expect(page.draft().id).toBe('asset-active');
+    expect(page.draft().archived_at).toBe('2026-01-01');
 
     page.reactivate(activeAsset);
     const reactivate = http.expectOne('/api/assets/asset-active/reactivate');
