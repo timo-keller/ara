@@ -1,5 +1,10 @@
 import { Routes } from '@angular/router';
-import { authenticatedGuard, groupAccessGuard, ownerGuard } from './core/auth/auth.guard';
+import {
+  assetAdministrationGuard,
+  authenticatedGuard,
+  groupAccessGuard,
+  ownerGuard,
+} from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -27,6 +32,15 @@ export const routes: Routes = [
     data: { title: 'Asset details' },
     loadComponent: () =>
       import('./features/assets/asset-detail.page').then((module) => module.AssetDetailPage),
+  },
+  {
+    path: 'asset-administration',
+    canActivate: [assetAdministrationGuard],
+    data: { title: 'Asset administration' },
+    loadComponent: () =>
+      import('./features/assets/asset-administration.page').then(
+        (module) => module.AssetAdministrationPage,
+      ),
   },
   {
     path: 'administration',

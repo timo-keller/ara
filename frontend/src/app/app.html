@@ -40,6 +40,16 @@
             Assets
           </syn-nav-item>
         }
+        @if (auth.hasAssetAdministrationAccess()) {
+          <syn-nav-item
+            [attr.current]="isCurrent('/asset-administration') ? '' : null"
+            href="/asset-administration"
+            (click)="navigate('/asset-administration', $event)"
+          >
+            <syn-icon aria-hidden="true" library="ara" name="inventory" slot="prefix"></syn-icon>
+            Manage assets
+          </syn-nav-item>
+        }
         @if (auth.roles()?.is_owner) {
           <syn-nav-item
             [attr.current]="isCurrent('/administration') ? '' : null"

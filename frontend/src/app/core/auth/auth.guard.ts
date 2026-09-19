@@ -34,3 +34,15 @@ export const groupAccessGuard: CanActivateFn = () => {
       ),
     );
 };
+
+export const assetAdministrationGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  return auth
+    .ensureSession()
+    .pipe(
+      map((authenticated) =>
+        authenticated && auth.hasAssetAdministrationAccess() ? true : router.createUrlTree(['/']),
+      ),
+    );
+};

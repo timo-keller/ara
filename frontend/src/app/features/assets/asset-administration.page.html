@@ -1,0 +1,121 @@
+<section aria-labelledby="asset-administration-heading">
+  <h1 id="asset-administration-heading">Asset administration</h1>
+  <p>
+    Manage assets in your authorized groups. Remote-access details are descriptive only; never enter
+    passwords, keys, tokens, or credentials.
+  </p>
+
+  @if (error()) {
+    <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
+  }
+
+  <syn-card>
+    <h2 slot="header">{{ draft().id ? 'Edit asset' : 'Create asset' }}</h2>
+    <form (submit)="$event.preventDefault(); save()">
+      @if (!draft().id) {
+        <syn-select
+          label="Group"
+          required
+          [value]="draft().group_id"
+          (valueChange)="changeGroup($event)"
+        >
+          <syn-option value="">Select a group</syn-option>
+          @for (group of manageableGroups(); track group.id) {
+            <syn-option [value]="group.id">{{ group.name }}</syn-option>
+          }
+        </syn-select>
+      } @else {
+        <p><strong>Group:</strong> {{ groupName(draft().group_id) }}</p>
+      }
+      <syn-input
+        label="Asset name"
+        required
+        [value]="draft().name"
+        (valueChange)="change('name', $event)"
+      ></syn-input>
+      <syn-input
+        label="Asset type"
+        required
+        help-text="For example: laptop, test bench, or camera."
+        [value]="draft().asset_type"
+        (valueChange)="change('asset_type', $event)"
+      ></syn-input>
+      <syn-textarea
+        label="Description"
+        [value]="draft().description || ''"
+        (valueChange)="change('description', $event)"
+      ></syn-textarea>
+      <syn-input
+        label="Remote host"
+        help-text="A hostname or address only; no credentials."
+        [value]="draft().remote_host || ''"
+        (valueChange)="change('remote_host', $event)"
+      ></syn-input>
+      <syn-input
+        label="Remote URL"
+        help-text="A safe link to the access service; no embedded credentials."
+        [value]="draft().remote_url || ''"
+        (valueChange)="change('remote_url', $event)"
+      ></syn-input>
+      <syn-input
+        label="Operating system"
+        [value]="draft().operating_system || ''"
+        (valueChange)="change('operating_system', $event)"
+      ></syn-input>
+      <syn-textarea
+        label="Access instructions"
+        help-text="Describe the approved access process, without passwords, keys, tokens, or credentials."
+        [value]="draft().access_instructions || ''"
+        (valueChange)="change('access_instructions', $event)"
+      ></syn-textarea>
+      <syn-textarea
+        label="Operational metadata (JSON)"
+        help-text="Optional non-sensitive operational details only. Credentials are rejected."
+        [value]="draft().operational_metadata_text"
+        (valueChange)="change('operational_metadata_text', $event)"
+      ></syn-textarea>
+      <syn-input
+        label="Webex room identifier"
+        help-text="Optional room identifier supported by the current API."
+        [value]="draft().webex_room_id || ''"
+        (valueChange)="change('webex_room_id', $event)"
+      ></syn-input>
+      <syn-button type="submit" variant="filled">{{
+        draft().id ? 'Save asset' : 'Create asset'
+      }}</syn-button>
+    </form>
+  </syn-card>
+
+  @if (state() === 'loading') {
+    <p class="state" aria-live="polite"><syn-spinner></syn-spinner> Loading assets…</p>
+  } @else if (state() === 'error') {
+    <syn-alert open variant="error"
+      >We could not load assets.
+      <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
+    >
+  } @else if (!manageableAssets().length) {
+    <p class="state" aria-live="polite">No assets are available to administer.</p>
+  } @else {
+    <section class="asset-list" aria-label="Managed assets">
+      @for (asset of manageableAssets(); track asset.id) {
+        <article>
+          <div>
+            <strong>{{ asset.name }}</strong> · {{ groupName(asset.group_id) }}
+            <syn-badge>{{ asset.asset_type }}</syn-badge>
+            <syn-badge>{{ asset.archived_at ? 'Archived' : 'Active' }}</syn-badge>
+          </div>
+          <div class="actions">
+            <syn-button type="button" variant="outline" (click)="edit(asset)">Edit</syn-button>
+            @if (asset.archived_at) {
+              <syn-button type="button" (click)="reactivate(asset)">Reactivate</syn-button>
+            } @else {
+              <syn-button type="button" variant="outline" (click)="archive(asset)"
+                >Archive</syn-button
+              >
+            }
+          </div>
+        </article>
+      }
+    </section>
+  }
+</section>

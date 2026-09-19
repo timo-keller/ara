@@ -32,6 +32,11 @@ export class AuthService {
   readonly hasGroupAccess = computed(
     () => this.roles()?.is_owner || Object.keys(this.roles()?.group_roles ?? {}).length > 0,
   );
+  readonly hasAssetAdministrationAccess = computed(
+    () =>
+      this.roles()?.is_owner ||
+      Object.values(this.roles()?.group_roles ?? {}).includes('group_admin'),
+  );
 
   private readonly http = inject(HttpClient);
 
