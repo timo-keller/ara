@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ara.core.errors import DomainError
 from ara.daos.groups import GroupDAO
 from ara.domain.models import Group, utc_now
+from ara.services.audit import AuditContext, AuditService, group_snapshot
 from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
@@ -18,9 +19,12 @@ class GroupService:
     commit in each method; DAOs deliberately never commit independently.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, audit_context: AuditContext | None = None
+    ) -> None:
         self.session = session
         self.groups = GroupDAO(session)
+        self.audit = AuditService(session, audit_context)
 
     async def create(
         self, actor_roles: EffectiveRoles, *, name: str, description: str | None
@@ -28,7 +32,7 @@ class GroupService:
         AuthorizationService.require_owner(actor_roles)
         group = Group(name=name, description=description)
         self.groups.add(group)
-        await self._commit(group)
+        await self._commit(group, "group.create", None)
         return group
 
     async def list_groups(
@@ -79,12 +83,13 @@ class GroupService:
     ) -> Group:
         AuthorizationService.require_owner(actor_roles)
         group = await self._get_required(group_id)
+        before = group_snapshot(group)
         if update_name:
             assert name is not None
             group.name = name
         if update_description:
             group.description = description
-        await self._commit(group)
+        await self._commit(group, "group.update", before)
         return group
 
     async def archive(self, actor_roles: EffectiveRoles, group_id: uuid.UUID) -> Group:
@@ -97,8 +102,9 @@ class GroupService:
                     "Group has unresolved reservations",
                     status_code=409,
                 )
+            before = group_snapshot(group)
             group.archived_at = utc_now()
-            await self._commit(group)
+            await self._commit(group, "group.archive", before)
         return group
 
     async def reactivate(
@@ -107,8 +113,9 @@ class GroupService:
         AuthorizationService.require_owner(actor_roles)
         group = await self._get_required(group_id)
         if group.archived_at is not None:
+            before = group_snapshot(group)
             group.archived_at = None
-            await self._commit(group)
+            await self._commit(group, "group.reactivate", before)
         return group
 
     async def _get_required(self, group_id: uuid.UUID) -> Group:
@@ -118,8 +125,19 @@ class GroupService:
             raise AssertionError("_not_found always raises")
         return group
 
-    async def _commit(self, group: Group) -> None:
+    async def _commit(
+        self, group: Group, action: str, before: dict[str, object] | None
+    ) -> None:
         try:
+            await self.session.flush()
+            self.audit.record(
+                action=action,
+                group_id=group.id,
+                target_type="group",
+                target_id=group.id,
+                before=before,
+                after=group_snapshot(group),
+            )
             await self.session.commit()
         except IntegrityError as error:
             await self.session.rollback()

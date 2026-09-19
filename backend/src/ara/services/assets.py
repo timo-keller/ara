@@ -10,16 +10,20 @@ from ara.core.errors import DomainError
 from ara.daos.assets import AssetDAO
 from ara.daos.groups import GroupDAO
 from ara.domain.models import Asset, Group, GroupRole, utc_now
+from ara.services.audit import AuditContext, AuditService, asset_snapshot
 from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
 class AssetService:
     """Own asset authorization, business rules, and mutation transactions."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, audit_context: AuditContext | None = None
+    ) -> None:
         self.session = session
         self.assets = AssetDAO(session)
         self.groups = GroupDAO(session)
+        self.audit = AuditService(session, audit_context)
 
     async def create(
         self, actor_roles: EffectiveRoles, *, group_id: uuid.UUID, **values: Any
@@ -29,7 +33,7 @@ class AssetService:
         self._require_active_group(group)
         asset = Asset(group_id=group.id, **values)
         self.assets.add(asset)
-        await self._commit(asset)
+        await self._commit(asset, "asset.create", None)
         return asset
 
     async def list_assets(
@@ -90,17 +94,19 @@ class AssetService:
     ) -> Asset:
         asset = await self._get_required(asset_id)
         AuthorizationService.require_group_admin(actor_roles, asset.group_id)
+        before = asset_snapshot(asset)
         for field, value in values.items():
             setattr(asset, field, value)
-        await self._commit(asset)
+        await self._commit(asset, "asset.update", before)
         return asset
 
     async def archive(self, actor_roles: EffectiveRoles, asset_id: uuid.UUID) -> Asset:
         asset = await self._get_required(asset_id)
         AuthorizationService.require_group_admin(actor_roles, asset.group_id)
         if asset.archived_at is None:
+            before = asset_snapshot(asset)
             asset.archived_at = utc_now()
-            await self._commit(asset)
+            await self._commit(asset, "asset.archive", before)
         return asset
 
     async def reactivate(
@@ -110,8 +116,9 @@ class AssetService:
         AuthorizationService.require_group_admin(actor_roles, asset.group_id)
         self._require_active_group(await self._get_group_required(asset.group_id))
         if asset.archived_at is not None:
+            before = asset_snapshot(asset)
             asset.archived_at = None
-            await self._commit(asset)
+            await self._commit(asset, "asset.reactivate", before)
         return asset
 
     async def _get_required(self, asset_id: uuid.UUID) -> Asset:
@@ -127,8 +134,19 @@ class AssetService:
             raise DomainError("group_not_found", "Group not found", status_code=404)
         return group
 
-    async def _commit(self, asset: Asset) -> None:
+    async def _commit(
+        self, asset: Asset, action: str, before: dict[str, object] | None
+    ) -> None:
         try:
+            await self.session.flush()
+            self.audit.record(
+                action=action,
+                group_id=asset.group_id,
+                target_type="asset",
+                target_id=asset.id,
+                before=before,
+                after=asset_snapshot(asset),
+            )
             await self.session.commit()
         except IntegrityError as error:
             await self.session.rollback()

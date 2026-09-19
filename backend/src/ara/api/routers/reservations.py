@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.api.routers import api_router
 from ara.api.routers.auth import require_authenticated_user, require_csrf
-from ara.api.routers.groups import get_effective_roles
+from ara.api.routers.groups import get_audit_context, get_effective_roles
 from ara.api.schemas.reservations import (
     ReservationCreateSchema,
     ReservationExtensionSchema,
@@ -17,6 +17,7 @@ from ara.api.schemas.reservations import (
 )
 from ara.domain.models import User
 from ara.infrastructure.database import get_session
+from ara.services.audit import AuditContext
 from ara.services.authorization import EffectiveRoles
 from ara.services.reservations import ReservationService
 
@@ -35,9 +36,10 @@ async def create_reservation(
     user: Annotated[User, Depends(require_authenticated_user)],
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session).create_for_current_user(
+    reservation = await ReservationService(session, audit).create_for_current_user(
         roles, user_id=user.id, **payload.model_dump()
     )
     return _reservation_schema(reservation)
@@ -52,9 +54,10 @@ async def extend_reservation(
     user: Annotated[User, Depends(require_authenticated_user)],
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session).extend_own(
+    reservation = await ReservationService(session, audit).extend_own(
         roles, actor_id=user.id, reservation_id=reservation_id, ends_at=payload.ends_at
     )
     return _reservation_schema(reservation)
@@ -68,9 +71,10 @@ async def return_reservation(
     user: Annotated[User, Depends(require_authenticated_user)],
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session).return_own(
+    reservation = await ReservationService(session, audit).return_own(
         roles, actor_id=user.id, reservation_id=reservation_id
     )
     return _reservation_schema(reservation)
@@ -84,9 +88,10 @@ async def cancel_reservation(
     user: Annotated[User, Depends(require_authenticated_user)],
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session).cancel(
+    reservation = await ReservationService(session, audit).cancel(
         roles, actor_id=user.id, reservation_id=reservation_id
     )
     return _reservation_schema(reservation)
@@ -98,9 +103,10 @@ async def end_reservation(
     user: Annotated[User, Depends(require_authenticated_user)],
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session).end_administratively(
+    reservation = await ReservationService(session, audit).end_administratively(
         roles, actor_id=user.id, reservation_id=reservation_id
     )
     return _reservation_schema(reservation)

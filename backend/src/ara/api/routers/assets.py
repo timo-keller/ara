@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.api.routers import api_router
 from ara.api.routers.auth import require_csrf
-from ara.api.routers.groups import get_effective_roles
+from ara.api.routers.groups import get_audit_context, get_effective_roles
 from ara.api.schemas.assets import (
     AssetCreateSchema,
     AssetListSchema,
@@ -17,6 +17,7 @@ from ara.api.schemas.assets import (
 )
 from ara.infrastructure.database import get_session
 from ara.services.assets import AssetService
+from ara.services.audit import AuditContext
 from ara.services.authorization import EffectiveRoles
 
 
@@ -31,9 +32,10 @@ async def create_asset(
     payload: AssetCreateSchema,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AssetSchema:
-    asset = await AssetService(session).create(roles, **payload.model_dump())
+    asset = await AssetService(session, audit).create(roles, **payload.model_dump())
     return _asset_schema(asset)
 
 
@@ -80,10 +82,11 @@ async def update_asset(
     payload: AssetUpdateSchema,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AssetSchema:
     return _asset_schema(
-        await AssetService(session).update(
+        await AssetService(session, audit).update(
             roles, asset_id, **payload.model_dump(exclude_unset=True)
         )
     )
@@ -94,9 +97,10 @@ async def archive_asset(
     asset_id: uuid.UUID,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AssetSchema:
-    return _asset_schema(await AssetService(session).archive(roles, asset_id))
+    return _asset_schema(await AssetService(session, audit).archive(roles, asset_id))
 
 
 @api_router.post("/assets/{asset_id}/reactivate", response_model=AssetSchema)
@@ -104,6 +108,7 @@ async def reactivate_asset(
     asset_id: uuid.UUID,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AssetSchema:
-    return _asset_schema(await AssetService(session).reactivate(roles, asset_id))
+    return _asset_schema(await AssetService(session, audit).reactivate(roles, asset_id))

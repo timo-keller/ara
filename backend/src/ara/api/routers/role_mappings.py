@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.api.routers import api_router
 from ara.api.routers.auth import get_current_application_session, require_csrf
-from ara.api.routers.groups import get_effective_roles
+from ara.api.routers.groups import get_audit_context, get_effective_roles
 from ara.api.schemas.role_mappings import (
     RoleMappingCreateSchema,
     RoleMappingListSchema,
@@ -19,6 +19,7 @@ from ara.api.schemas.role_mappings import (
 )
 from ara.domain.models import ApplicationSession
 from ara.infrastructure.database import get_session
+from ara.services.audit import AuditContext
 from ara.services.authorization import EffectiveRoles
 from ara.services.role_mappings import RoleMappingService
 
@@ -36,10 +37,11 @@ async def create_role_mapping(
     payload: RoleMappingCreateSchema,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RoleMappingSchema:
     return _mapping_schema(
-        await RoleMappingService(session).create(roles, **payload.model_dump())
+        await RoleMappingService(session, audit).create(roles, **payload.model_dump())
     )
 
 
@@ -68,11 +70,12 @@ async def update_role_mapping(
     payload: RoleMappingUpdateSchema,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RoleMappingSchema:
     values = payload.model_dump(exclude_unset=True)
     return _mapping_schema(
-        await RoleMappingService(session).update(
+        await RoleMappingService(session, audit).update(
             roles,
             mapping_id,
             group_id=values.get("group_id"),
@@ -91,9 +94,12 @@ async def disable_role_mapping(
     mapping_id: uuid.UUID,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RoleMappingSchema:
-    return _mapping_schema(await RoleMappingService(session).disable(roles, mapping_id))
+    return _mapping_schema(
+        await RoleMappingService(session, audit).disable(roles, mapping_id)
+    )
 
 
 @api_router.post(
@@ -103,9 +109,12 @@ async def archive_role_mapping(
     mapping_id: uuid.UUID,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> RoleMappingSchema:
-    return _mapping_schema(await RoleMappingService(session).archive(roles, mapping_id))
+    return _mapping_schema(
+        await RoleMappingService(session, audit).archive(roles, mapping_id)
+    )
 
 
 @api_router.post("/role-mappings/test", response_model=RoleMappingTestResultSchema)

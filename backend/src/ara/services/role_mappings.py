@@ -11,6 +11,7 @@ from ara.core.errors import DomainError
 from ara.daos.groups import GroupDAO
 from ara.daos.role_mappings import RoleMappingDAO
 from ara.domain.models import GroupRole, RoleMapping, utc_now
+from ara.services.audit import AuditContext, AuditService, role_mapping_snapshot
 from ara.services.authorization import (
     AuthorizationService,
     EffectiveRoles,
@@ -21,10 +22,13 @@ from ara.services.authorization import (
 class RoleMappingService:
     """Validate role mappings before their service-owned persistence transaction."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, audit_context: AuditContext | None = None
+    ) -> None:
         self.session = session
         self.groups = GroupDAO(session)
         self.mappings = RoleMappingDAO(session)
+        self.audit = AuditService(session, audit_context)
 
     async def create(
         self,
@@ -48,8 +52,7 @@ class RoleMappingService:
             priority=priority,
         )
         self.mappings.add(mapping)
-        await self.session.commit()
-        await self.session.refresh(mapping)
+        await self._commit(mapping, "role_mapping.create", None)
         return mapping
 
     async def list_mappings(
@@ -80,6 +83,7 @@ class RoleMappingService:
         """Update an Owner-managed mapping after validating changed fields."""
         AuthorizationService.require_owner(actor_roles)
         mapping = await self._get_required(mapping_id)
+        before = role_mapping_snapshot(mapping)
         if group_id is not None:
             await self._require_active_group(group_id)
             mapping.group_id = group_id
@@ -92,22 +96,19 @@ class RoleMappingService:
             mapping.enabled = enabled
         if priority is not None:
             mapping.priority = priority
-        await self._commit(mapping)
+        await self._commit(mapping, "role_mapping.update", before)
         return mapping
 
     async def disable(
         self, actor_roles: EffectiveRoles, mapping_id: uuid.UUID
     ) -> RoleMapping:
         """Disable a mapping without removing its administrative history."""
-        return await self.update(
-            actor_roles,
-            mapping_id,
-            group_id=None,
-            expression=None,
-            role=None,
-            enabled=False,
-            priority=None,
-        )
+        AuthorizationService.require_owner(actor_roles)
+        mapping = await self._get_required(mapping_id)
+        before = role_mapping_snapshot(mapping)
+        mapping.enabled = False
+        await self._commit(mapping, "role_mapping.disable", before)
+        return mapping
 
     async def archive(
         self, actor_roles: EffectiveRoles, mapping_id: uuid.UUID
@@ -116,8 +117,9 @@ class RoleMappingService:
         AuthorizationService.require_owner(actor_roles)
         mapping = await self._get_required(mapping_id)
         if mapping.archived_at is None:
+            before = role_mapping_snapshot(mapping)
             mapping.archived_at = utc_now()
-            await self._commit(mapping)
+            await self._commit(mapping, "role_mapping.archive", before)
         return mapping
 
     async def test_expression(
@@ -159,6 +161,21 @@ class RoleMappingService:
             )
         return mapping
 
-    async def _commit(self, mapping: RoleMapping) -> None:
-        await self.session.commit()
+    async def _commit(
+        self, mapping: RoleMapping, action: str, before: dict[str, object] | None
+    ) -> None:
+        try:
+            await self.session.flush()
+            self.audit.record(
+                action=action,
+                group_id=mapping.group_id,
+                target_type="role_mapping",
+                target_id=mapping.id,
+                before=before,
+                after=role_mapping_snapshot(mapping),
+            )
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
         await self.session.refresh(mapping)

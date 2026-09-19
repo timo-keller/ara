@@ -42,6 +42,7 @@ class EffectiveRoles:
 
     is_owner: bool
     group_roles: Mapping[uuid.UUID, GroupRole]
+    actor_id: uuid.UUID | None = None
 
     def is_group_admin(self, group_id: uuid.UUID) -> bool:
         return self.is_owner or self.group_roles.get(group_id) is GroupRole.GROUP_ADMIN
@@ -79,7 +80,9 @@ class RoleResolutionService:
                 current = group_roles.get(mapping.group_id)
                 if current is not GroupRole.GROUP_ADMIN:
                     group_roles[mapping.group_id] = mapping.role
-        return EffectiveRoles(is_owner=is_owner, group_roles=group_roles)
+        return EffectiveRoles(
+            is_owner=is_owner, group_roles=group_roles, actor_id=user.id
+        )
 
     async def resolve_session(
         self, application_session: ApplicationSession

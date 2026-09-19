@@ -18,18 +18,22 @@ from ara.domain.models import (
     ReservationStatus,
     utc_now,
 )
+from ara.services.audit import AuditContext, AuditService, reservation_snapshot
 from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
 class ReservationService:
     """Own reservation interval rules and SQLite write transactions."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, audit_context: AuditContext | None = None
+    ) -> None:
         self.session = session
         self.reservations = ReservationDAO(session)
         self.assets = AssetDAO(session)
         self.groups = GroupDAO(session)
         self.users = UserDAO(session)
+        self.audit = AuditService(session, audit_context)
 
     async def create(
         self,
@@ -49,6 +53,7 @@ class ReservationService:
         self._validate_interval(starts_at, ends_at)
         await self._begin_immediate()
         try:
+            asset = await self._get_asset_required(asset_id)
             await self.ensure_available(
                 asset_id=asset_id, starts_at=starts_at, ends_at=ends_at
             )
@@ -59,6 +64,15 @@ class ReservationService:
                 ends_at=ends_at,
             )
             self.reservations.add(reservation)
+            await self.session.flush()
+            self.audit.record(
+                action="reservation.create",
+                group_id=asset.group_id,
+                target_type="reservation",
+                target_id=reservation.id,
+                before=None,
+                after=reservation_snapshot(reservation),
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -96,6 +110,15 @@ class ReservationService:
                 ends_at=ends_at,
             )
             self.reservations.add(reservation)
+            await self.session.flush()
+            self.audit.record(
+                action="reservation.create",
+                group_id=group.id,
+                target_type="reservation",
+                target_id=reservation.id,
+                before=None,
+                after=reservation_snapshot(reservation),
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -138,7 +161,17 @@ class ReservationService:
                 ends_at=ends_at,
                 exclude_reservation_id=reservation.id,
             )
+            before = reservation_snapshot(reservation)
             reservation.ends_at = ends_at
+            await self.session.flush()
+            self.audit.record(
+                action="reservation.extend",
+                group_id=asset.group_id,
+                target_type="reservation",
+                target_id=reservation.id,
+                before=before,
+                after=reservation_snapshot(reservation),
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -160,9 +193,19 @@ class ReservationService:
             self._require_owner(reservation, actor_id)
             now = utc_now()
             self._require_current(reservation, now)
+            before = reservation_snapshot(reservation)
             reservation.status = ReservationStatus.RETURNED
             reservation.returned_at = now
             self._record_early_end(reservation, now)
+            await self.session.flush()
+            self.audit.record(
+                action="reservation.return",
+                group_id=asset.group_id,
+                target_type="reservation",
+                target_id=reservation.id,
+                before=before,
+                after=reservation_snapshot(reservation),
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -186,8 +229,18 @@ class ReservationService:
                 AuthorizationService.require_group_user(actor_roles, asset.group_id)
             now = utc_now()
             self._require_future(reservation, now)
+            before = reservation_snapshot(reservation)
             reservation.status = ReservationStatus.CANCELLED
             reservation.cancelled_at = now
+            await self.session.flush()
+            self.audit.record(
+                action="reservation.cancel",
+                group_id=asset.group_id,
+                target_type="reservation",
+                target_id=reservation.id,
+                before=before,
+                after=reservation_snapshot(reservation),
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -208,9 +261,19 @@ class ReservationService:
             AuthorizationService.require_group_admin(actor_roles, asset.group_id)
             now = utc_now()
             self._require_current(reservation, now)
+            before = reservation_snapshot(reservation)
             reservation.status = ReservationStatus.ENDED
             reservation.ended_at = now
             self._record_early_end(reservation, now)
+            await self.session.flush()
+            self.audit.record(
+                action="reservation.end",
+                group_id=asset.group_id,
+                target_type="reservation",
+                target_id=reservation.id,
+                before=before,
+                after=reservation_snapshot(reservation),
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()

@@ -7,7 +7,10 @@ from fastapi import Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.api.routers import api_router
-from ara.api.routers.auth import get_current_application_session, require_csrf
+from ara.api.routers.auth import (
+    get_current_application_session,
+    require_csrf,
+)
 from ara.api.schemas.groups import (
     GroupCreateSchema,
     GroupListSchema,
@@ -15,8 +18,10 @@ from ara.api.schemas.groups import (
     GroupUpdateSchema,
 )
 from ara.core.config import get_settings
+from ara.core.request_context import get_correlation_id
 from ara.domain.models import ApplicationSession
 from ara.infrastructure.database import get_session
+from ara.services.audit import AuditContext
 from ara.services.authorization import EffectiveRoles, RoleResolutionService
 from ara.services.groups import GroupService
 
@@ -33,6 +38,13 @@ async def get_effective_roles(
     ).resolve_session(application_session)
 
 
+async def get_audit_context(
+    roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
+) -> AuditContext:
+    """Build transport-neutral audit metadata from authenticated role resolution."""
+    return AuditContext(actor_id=roles.actor_id, correlation_id=get_correlation_id())
+
+
 def _group_schema(group: object) -> GroupSchema:
     return GroupSchema.model_validate(group, from_attributes=True)
 
@@ -44,9 +56,10 @@ async def create_group(
     payload: GroupCreateSchema,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GroupSchema:
-    group = await GroupService(session).create(roles, **payload.model_dump())
+    group = await GroupService(session, audit).create(roles, **payload.model_dump())
     return _group_schema(group)
 
 
@@ -84,10 +97,11 @@ async def update_group(
     payload: GroupUpdateSchema,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GroupSchema:
     values = payload.model_dump(exclude_unset=True)
-    group = await GroupService(session).update(
+    group = await GroupService(session, audit).update(
         roles,
         group_id,
         name=values.get("name"),
@@ -103,9 +117,10 @@ async def archive_group(
     group_id: uuid.UUID,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GroupSchema:
-    return _group_schema(await GroupService(session).archive(roles, group_id))
+    return _group_schema(await GroupService(session, audit).archive(roles, group_id))
 
 
 @api_router.post("/groups/{group_id}/reactivate", response_model=GroupSchema)
@@ -113,6 +128,7 @@ async def reactivate_group(
     group_id: uuid.UUID,
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     _csrf: Annotated[None, Depends(require_csrf)],
+    audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> GroupSchema:
-    return _group_schema(await GroupService(session).reactivate(roles, group_id))
+    return _group_schema(await GroupService(session, audit).reactivate(roles, group_id))
