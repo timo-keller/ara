@@ -33,13 +33,17 @@
         [value]="draft().name"
         (valueChange)="change('name', $event)"
       ></syn-input>
-      <syn-input
+      <syn-combobox
         label="Asset type"
         required
         help-text="For example: laptop, test bench, or camera."
         [value]="draft().asset_type"
-        (valueChange)="change('asset_type', $event)"
-      ></syn-input>
+        (valueChange)="changeAssetType($event)"
+      >
+        @for (type of assetTypeSuggestions(); track type) {
+          <syn-option [value]="type">{{ type }}</syn-option>
+        }
+      </syn-combobox>
       <syn-textarea
         label="Description"
         [value]="draft().description || ''"

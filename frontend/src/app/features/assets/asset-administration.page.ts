@@ -4,6 +4,7 @@ import { SynAlertComponent } from '@synergy-design-system/angular/components/ale
 import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
 import { SynCardComponent } from '@synergy-design-system/angular/components/card';
+import { SynComboboxComponent } from '@synergy-design-system/angular/components/combobox';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
 import { SynOptionComponent } from '@synergy-design-system/angular/components/option';
 import { SynSelectComponent } from '@synergy-design-system/angular/components/select';
@@ -39,6 +40,7 @@ const emptyDraft = (): AssetDraft => ({
     SynBadgeComponent,
     SynButtonComponent,
     SynCardComponent,
+    SynComboboxComponent,
     SynInputComponent,
     SynOptionComponent,
     SynSelectComponent,
@@ -66,6 +68,17 @@ export class AssetAdministrationPage {
     if (this.auth.roles()?.is_owner) return this.assets();
     const groupIds = new Set(this.manageableGroups().map((group) => group.id));
     return this.assets().filter((asset) => groupIds.has(asset.group_id));
+  });
+  readonly assetTypeSuggestions = computed(() => {
+    const groupId = this.draft().group_id;
+    const suggestions = new Map<string, string>();
+    for (const asset of this.manageableAssets()) {
+      if (asset.group_id !== groupId) continue;
+      const type = this.normalizeAssetType(asset.asset_type);
+      const key = type.toLowerCase();
+      if (type && !suggestions.has(key)) suggestions.set(key, type);
+    }
+    return [...suggestions.values()];
   });
 
   constructor() {
@@ -100,6 +113,10 @@ export class AssetAdministrationPage {
 
   changeGroup(value: string | number | (string | number)[]): void {
     this.draft.update((draft) => ({ ...draft, group_id: String(value) }));
+  }
+
+  changeAssetType(value: string | number | (string | number)[]): void {
+    this.change('asset_type', Array.isArray(value) ? String(value[0] ?? '') : String(value));
   }
 
   edit(asset: Asset): void {
@@ -183,6 +200,10 @@ export class AssetAdministrationPage {
 
   private nullable(value: string | null): string | null {
     return value?.trim() || null;
+  }
+
+  private normalizeAssetType(value: string): string {
+    return value.trim().replace(/\s+/g, ' ');
   }
 
   private loadError(error: unknown): void {

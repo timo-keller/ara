@@ -98,13 +98,61 @@ describe('AssetAdministrationPage', () => {
     );
   });
 
+  it('suggests normalized asset types only from the selected manageable group', () => {
+    setRoles(true, {});
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.assets.set([
+      { ...activeAsset, asset_type: ' Laptop ' },
+      { ...activeAsset, id: 'asset-duplicate', asset_type: 'laptop' },
+      {
+        ...activeAsset,
+        id: 'asset-archived-type',
+        asset_type: 'Test   bench',
+        archived_at: '2026-01-01',
+      },
+      { ...activeAsset, id: 'asset-user', group_id: 'group-user', asset_type: 'Camera' },
+      { ...activeAsset, id: 'asset-other', group_id: 'group-other', asset_type: 'Server' },
+    ]);
+
+    page.changeGroup('group-admin');
+    expect(page.assetTypeSuggestions()).toEqual(['Laptop', 'Test bench']);
+    page.changeGroup('group-user');
+    expect(page.assetTypeSuggestions()).toEqual(['Camera']);
+    page.changeGroup('group-other');
+    expect(page.assetTypeSuggestions()).toEqual(['Server']);
+  });
+
+  it('limits suggestions to a Group Admin scope and uses an edited asset group', () => {
+    setRoles(false, { 'group-admin': 'group_admin', 'group-user': 'user' });
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.assets.set([
+      { ...activeAsset, asset_type: 'Laptop' },
+      {
+        ...activeAsset,
+        id: 'asset-archived-type',
+        asset_type: 'Test bench',
+        archived_at: '2026-01-01',
+      },
+      { ...activeAsset, id: 'asset-user', group_id: 'group-user', asset_type: 'Camera' },
+    ]);
+
+    page.changeGroup('group-user');
+    expect(page.assetTypeSuggestions()).toEqual([]);
+    page.edit({ ...activeAsset, asset_type: 'Laptop' });
+    expect(page.assetTypeSuggestions()).toEqual(['Laptop', 'Test bench']);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('syn-combobox')).not.toBeNull();
+  });
+
   it('creates, edits, archives, and reactivates using the asset API contract', () => {
     setRoles(true, {});
     const fixture = createReadyPage();
     const page = fixture.componentInstance;
     page.changeGroup('group-admin');
     page.change('name', 'New laptop');
-    page.change('asset_type', 'laptop');
+    page.changeAssetType('New custom type');
     page.change('remote_host', 'remote.example.test');
     page.change('webex_room_id', 'room-42');
     page.change('operational_metadata_text', '{"location":"Lab A"}');
@@ -113,7 +161,7 @@ describe('AssetAdministrationPage', () => {
     expect(create.request.method).toBe('POST');
     expect(create.request.body).toEqual({
       group_id: 'group-admin',
-      asset_type: 'laptop',
+      asset_type: 'New custom type',
       name: 'New laptop',
       description: null,
       operational_metadata: { location: 'Lab A' },
