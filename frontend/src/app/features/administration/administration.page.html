@@ -80,6 +80,7 @@
           label="Priority"
           type="number"
           min="0"
+          help-text="Lower numbers are evaluated first. Equal priorities use a stable, deterministic identifier order. Priority never overrides an Owner grant."
           [value]="mappingDraft().priority"
           (valueChange)="changeMapping('priority', $event)"
         ></syn-input>

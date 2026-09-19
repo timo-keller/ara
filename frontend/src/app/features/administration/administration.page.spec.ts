@@ -60,6 +60,59 @@ describe('AdministrationPage', () => {
     expect(fixture.nativeElement.textContent).toContain('matches your current sign-in claims');
   });
 
+  it('explains priority and retains non-negative whole-number validation', () => {
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    const priorityInput = fixture.nativeElement.querySelector('syn-input[label="Priority"]');
+
+    expect(priorityInput.getAttribute('help-text')).toBe(
+      'Lower numbers are evaluated first. Equal priorities use a stable, deterministic identifier order. Priority never overrides an Owner grant.',
+    );
+    expect(page.mappingDraft().priority).toBe('0');
+
+    page.changeMapping('group_id', group.id);
+    page.changeMapping('expression', 'true');
+    page.changeMapping('priority', '-1');
+    page.saveMapping();
+
+    expect(page.error()).toBe('Priority must be a whole number of zero or more.');
+
+    page.changeMapping('priority', '1.5');
+    page.saveMapping();
+
+    expect(page.error()).toBe('Priority must be a whole number of zero or more.');
+  });
+
+  it('sends selected integer priorities when creating and editing mappings', () => {
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+
+    page.changeMapping('group_id', group.id);
+    page.changeMapping('expression', 'true');
+    page.changeMapping('priority', '3');
+    page.saveMapping();
+
+    const create = http.expectOne('/api/role-mappings');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body.priority).toBe(3);
+
+    page.editMapping({
+      id: 'mapping-1',
+      group_id: group.id,
+      expression: 'true',
+      role: 'user',
+      enabled: true,
+      priority: 3,
+      archived_at: null,
+    });
+    page.changeMapping('priority', '4');
+    page.saveMapping();
+
+    const update = http.expectOne('/api/role-mappings/mapping-1');
+    expect(update.request.method).toBe('PATCH');
+    expect(update.request.body.priority).toBe(4);
+  });
+
   it('presents API validation details and unresolved reservation resolution steps', () => {
     const fixture = createReadyPage();
     const page = fixture.componentInstance;
