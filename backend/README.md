@@ -31,6 +31,27 @@ tables at startup. Run pending migrations before starting the API:
 uv run alembic upgrade head
 ```
 
+## Production container
+
+Build the backend from the `backend` directory. The image installs the locked
+runtime dependency set only, runs as the `ara` user, and stores its default
+SQLite database in the writable `/app/data` mount point.
+
+```sh
+docker build -t ara-backend .
+```
+
+The entrypoint validates required configuration, runs `alembic upgrade head`,
+then `exec`s exactly one Uvicorn worker. Do not enable reload or additional
+workers: the application's lifespan owns the single APScheduler instance.
+Provide production secrets with the documented `/run/secrets` `_FILE` settings.
+The image healthcheck calls `GET /api/health/live` using Python's standard
+library. For a local, non-secret image smoke test, run:
+
+```sh
+./scripts/verify-container.sh
+```
+
 ## Scheduled work
 
 APScheduler runs in the FastAPI lifespan and uses one asyncio scheduler per

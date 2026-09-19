@@ -141,6 +141,7 @@ async def scheduler_lifespan(app: FastAPI):
     register_audit_retention_job(scheduler)
     app.state.scheduler = scheduler
     scheduler.start()
+    logging.getLogger("uvicorn.error").info("ARA scheduler started")
     try:
         yield
     finally:

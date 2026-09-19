@@ -78,6 +78,7 @@ dependencies = [
     { name = "apscheduler" },
     { name = "authlib" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "jmespath" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
@@ -86,7 +87,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -100,6 +100,7 @@ requires-dist = [
     { name = "apscheduler", specifier = ">=3.11,<4" },
     { name = "authlib", specifier = ">=1.4,<2.0" },
     { name = "fastapi", specifier = ">=0.115,<1.0" },
+    { name = "httpx", specifier = ">=0.28,<1.0" },
     { name = "jmespath", specifier = ">=1.0,<2.0" },
     { name = "pydantic-settings", specifier = ">=2.7,<3.0" },
     { name = "sqlalchemy", specifier = ">=2.0,<3.0" },
@@ -108,7 +109,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28,<1.0" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-asyncio", specifier = ">=0.24,<1.0" },
     { name = "ruff", specifier = ">=0.8,<1.0" },

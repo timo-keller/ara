@@ -1,0 +1,29 @@
+# Local environments, caches, and test-only files must never become image input.
+.venv
+.pytest_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+tests
+scripts
+
+# Local configuration, credentials, and application data are runtime mounts.
+.env
+.env.*
+secrets
+certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+data
+*.db
+*.db-*
+
+# Repository and editor metadata are not production inputs.
+.git
+.gitignore
+.DS_Store
+.idea
+.vscode
