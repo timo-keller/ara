@@ -38,6 +38,9 @@ _ENVIRONMENT_SETTINGS = {
     "ARA_OIDC_CLIENT_ID": "oidc_client_id",
     "ARA_OIDC_SCOPES": "oidc_scopes",
     "ARA_AUDIT_RETENTION_DAYS": "audit_retention_days",
+    "ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES": (
+        "notification_reminder_offsets_minutes"
+    ),
 }
 
 
@@ -131,6 +134,7 @@ class Settings(BaseSettings):
     session_secret: SecretStr
     owner_subjects: SecretStr
     audit_retention_days: int = Field(default=365, gt=0)
+    notification_reminder_offsets_minutes: tuple[int, ...] = (60, 15, 0)
 
     @field_validator("oidc_scopes", mode="before")
     @classmethod
@@ -138,6 +142,28 @@ class Settings(BaseSettings):
         """Accept the conventional space-separated OIDC scope environment value."""
         if isinstance(value, str):
             return tuple(scope for scope in value.replace(",", " ").split() if scope)
+        return value
+
+    @field_validator("notification_reminder_offsets_minutes", mode="before")
+    @classmethod
+    def split_reminder_offsets(cls, value: Any) -> Any:
+        """Accept comma- or whitespace-separated, non-negative minute offsets."""
+        if isinstance(value, str):
+            values = tuple(int(offset) for offset in value.replace(",", " ").split())
+            if not values:
+                raise ValueError("must contain at least one offset")
+            return values
+        return value
+
+    @field_validator("notification_reminder_offsets_minutes")
+    @classmethod
+    def validate_reminder_offsets(cls, value: tuple[int, ...]) -> tuple[int, ...]:
+        if not value:
+            raise ValueError("must contain at least one offset")
+        if any(offset < 0 for offset in value):
+            raise ValueError("offsets must be non-negative minutes")
+        if len(set(value)) != len(value):
+            raise ValueError("offsets must not contain duplicates")
         return value
 
     @field_validator("oidc_client_secret", "session_secret", "owner_subjects")

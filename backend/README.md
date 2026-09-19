@@ -13,7 +13,9 @@ The backend reads non-sensitive settings from environment variables:
 `ARA_DATABASE_URL` (default: `sqlite+aiosqlite:////app/data/ara.db`),
 `ARA_PUBLIC_URL`, `ARA_OIDC_ISSUER_URL`, `ARA_OIDC_CLIENT_ID`,
 `ARA_OIDC_SCOPES` (default: `openid profile email`), and
-`ARA_AUDIT_RETENTION_DAYS` (default: `365`).
+`ARA_AUDIT_RETENTION_DAYS` (default: `365`), and
+`ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES` (comma- or space-separated
+non-negative minute offsets; default: `60 15 0`). Offsets must be unique.
 
 `ARA_OIDC_CLIENT_SECRET`, `ARA_SESSION_SECRET`, and `ARA_OWNER_SUBJECTS` are
 required secrets. In production provide each through its corresponding
@@ -38,6 +40,19 @@ deployment must continue to use exactly one backend process and one Uvicorn
 worker: the in-process scheduler is not safe to run across multiple workers.
 Job executions coalesce missed runs, allow one concurrent instance, and have a
 60-second misfire grace period.
+
+Reservation reminders run every minute. They create an in-application record
+for every configured offset once its scheduled time is due, including overdue
+records after downtime. Open-ended, returned, cancelled, and administratively
+ended reservations are excluded. The database uniqueness key
+`(reservation_id, kind, scheduled_for)` (where kind includes the offset) makes
+repeated runs idempotent.
+
+`GET /api/notifications` returns only the authenticated user's notifications,
+paginated with `offset` and `limit`, newest-first by `created_at` with `id` as
+the tie-breaker. `POST /api/notifications/{id}/read` requires CSRF protection,
+returns `404` for another user's record, and is idempotent: once set, the
+original `read_at` is retained.
 
 ## Health and API conventions
 

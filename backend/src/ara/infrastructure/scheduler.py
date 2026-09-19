@@ -20,11 +20,46 @@ SCHEDULER_JOB_DEFAULTS = {
 }
 
 scheduler_logger = logging.getLogger("ara.scheduler")
+RESERVATION_REMINDER_JOB_ID = "reservation-reminders"
+RESERVATION_REMINDER_INTERVAL_SECONDS = 60
 
 
 def create_scheduler() -> AsyncIOScheduler:
     """Create the one in-process asyncio scheduler for an application process."""
     return AsyncIOScheduler(job_defaults=SCHEDULER_JOB_DEFAULTS)
+
+
+async def generate_reservation_reminders(session: AsyncSession) -> int:
+    """Run reminder generation with the current validated backend offsets."""
+    from ara.core.config import get_settings
+    from ara.services.notifications import NotificationService
+
+    return await NotificationService(session).generate_due_reminders(
+        get_settings().notification_reminder_offsets_minutes
+    )
+
+
+async def run_reservation_reminder_job() -> int:
+    """Scheduler entry point; ``run_scheduled_job`` supplies an independent session."""
+    return await run_scheduled_job(
+        RESERVATION_REMINDER_JOB_ID, generate_reservation_reminders
+    )
+
+
+def register_reservation_reminder_job(scheduler: AsyncIOScheduler) -> None:
+    """Register the one idempotent periodic reminder job on a scheduler."""
+    # APScheduler keeps pre-start jobs in a pending list, where
+    # ``replace_existing`` alone does not replace a matching pending job.
+    for job in scheduler.get_jobs():
+        if job.id == RESERVATION_REMINDER_JOB_ID:
+            scheduler.remove_job(job.id)
+    scheduler.add_job(
+        run_reservation_reminder_job,
+        "interval",
+        seconds=RESERVATION_REMINDER_INTERVAL_SECONDS,
+        id=RESERVATION_REMINDER_JOB_ID,
+        replace_existing=True,
+    )
 
 
 async def run_scheduled_job[JobResult](
@@ -57,6 +92,7 @@ async def run_scheduled_job[JobResult](
 async def scheduler_lifespan(app: FastAPI):
     """Start one scheduler for this app process and stop it gracefully."""
     scheduler = create_scheduler()
+    register_reservation_reminder_job(scheduler)
     app.state.scheduler = scheduler
     scheduler.start()
     try:

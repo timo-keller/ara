@@ -7,8 +7,10 @@ from sqlalchemy import text
 from ara.infrastructure.database import create_engine, create_session_factory
 from ara.infrastructure.scheduler import (
     MISFIRE_GRACE_TIME_SECONDS,
+    RESERVATION_REMINDER_JOB_ID,
     SCHEDULER_JOB_DEFAULTS,
     create_scheduler,
+    register_reservation_reminder_job,
     run_scheduled_job,
     scheduler_lifespan,
 )
@@ -19,6 +21,14 @@ def test_scheduler_has_safe_job_defaults() -> None:
 
     assert scheduler._job_defaults == SCHEDULER_JOB_DEFAULTS
     assert scheduler._job_defaults["misfire_grace_time"] == MISFIRE_GRACE_TIME_SECONDS
+
+
+def test_reminder_job_registration_does_not_duplicate_the_job() -> None:
+    scheduler = create_scheduler()
+    register_reservation_reminder_job(scheduler)
+    register_reservation_reminder_job(scheduler)
+
+    assert [job.id for job in scheduler.get_jobs()] == [RESERVATION_REMINDER_JOB_ID]
 
 
 @pytest.mark.asyncio

@@ -32,6 +32,22 @@ def test_settings_load_non_sensitive_environment_values() -> None:
     assert settings.audit_retention_days == 90
 
 
+@pytest.mark.parametrize("value", ["", "15 15", "-1, 0"])
+def test_reminder_offsets_are_validated(value: str) -> None:
+    with pytest.raises(ValidationError):
+        Settings.from_environment(
+            environment() | {"ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES": value}
+        )
+
+
+def test_reminder_offsets_are_parsed_as_minutes() -> None:
+    settings = Settings.from_environment(
+        environment() | {"ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES": "120, 15 0"}
+    )
+
+    assert settings.notification_reminder_offsets_minutes == (120, 15, 0)
+
+
 def test_secret_files_are_loaded_and_redacted(tmp_path: Path) -> None:
     for name, value in {
         "oidc": "oidc-secret\n",
