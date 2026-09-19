@@ -1,4 +1,4 @@
-import { Component, ViewChild, inject, signal } from '@angular/core';
+import { Component, ViewChild, afterEveryRender, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
 import { SynHeaderComponent } from '@synergy-design-system/angular/components/header';
@@ -7,7 +7,8 @@ import { SynNavItemComponent } from '@synergy-design-system/angular/components/n
 import { SynSideNavComponent } from '@synergy-design-system/angular/components/side-nav';
 import { filter } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
-import { NotificationComponent } from './core/notifications/notification.component';
+import { CompactModeService } from './core/settings/compact-mode.service';
+import { SettingsComponent } from './core/settings/settings.component';
 
 @Component({
   imports: [
@@ -16,7 +17,7 @@ import { NotificationComponent } from './core/notifications/notification.compone
     SynHeaderComponent,
     SynIconComponent,
     SynNavItemComponent,
-    NotificationComponent,
+    SettingsComponent,
     SynSideNavComponent,
   ],
   selector: 'app-root',
@@ -42,9 +43,11 @@ export class App {
   readonly currentUrl = signal('/');
 
   readonly auth = inject(AuthService);
+  private readonly compactMode = inject(CompactModeService);
   private readonly router = inject(Router);
 
   constructor() {
+    afterEveryRender(() => this.compactMode.apply());
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .subscribe((event) => {

@@ -1,0 +1,20 @@
+<syn-dropdown placement="bottom-end" stayOpenOnSelect>
+  <syn-button
+    slot="trigger"
+    [attr.aria-label]="accessibleLabel()"
+    title="Settings"
+    type="button"
+    variant="text"
+  >
+    <syn-icon aria-hidden="true" library="ara" name="settings"></syn-icon>
+    @if (notifications.unreadCount() > 0) {
+      <syn-badge aria-hidden="true" variant="primary">{{ notifications.unreadCount() }}</syn-badge>
+    }
+  </syn-button>
+  <section class="settings-panel" aria-label="Settings">
+    <syn-switch [checked]="compactMode.compact()" (checkedChange)="compactMode.setCompact($event)">
+      Compact mode
+    </syn-switch>
+    <app-notifications />
+  </section>
+</syn-dropdown>

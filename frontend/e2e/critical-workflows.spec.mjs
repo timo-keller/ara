@@ -75,6 +75,25 @@ test('authenticated discovery, future/open-ended conflicts, extension, cancellat
   await expect(page.getByText('Reservation extended')).toBeVisible();
 });
 
+test('settings menu exposes notifications and preserves compact mode', async ({
+  page,
+  context,
+}) => {
+  await login(context, page, 'alpha-user');
+
+  const settings = page.getByRole('button', { name: 'Settings' });
+  await settings.focus();
+  await settings.press('Enter');
+  await expect(page.getByText('Compact mode')).toBeVisible();
+  await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
+
+  await page.locator('syn-switch').locator('[part="control"]').click();
+  await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
+  await page.reload();
+  await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
+  await expect(page.locator('syn-button').first()).toHaveAttribute('size', 'small');
+});
+
 test('group admin is scoped in the UI, API, and audit history while a user is denied', async ({
   browser,
 }) => {
