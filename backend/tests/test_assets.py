@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ara.api.routers import auth as auth_router
 from ara.api.routers import groups as group_router
-from ara.domain.models import Group, GroupRole
+from ara.api.schemas.assets import _safe_metadata
+from ara.domain.models import Group, GroupRole, Reservation, User, utc_now
 from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
 from ara.services.authorization import EffectiveRoles
@@ -57,6 +59,7 @@ def test_asset_api_roles_filters_pagination_archival_and_credentials(
     laptop = _create(client, lab, "Laptop", "computer", "fast Linux machine")
     _create(client, lab, "Alpha", "computer", "portable")
     beta = _create(client, other, "Beta", "phone", "test phone")
+    _reserve_now(factory, str(beta["id"]))
 
     assert (
         client.post(
@@ -102,6 +105,14 @@ def test_asset_api_roles_filters_pagination_archival_and_credentials(
         client.get("/api/assets", params={"asset_type": "phone"}).json()["total"] == 1
     )
     assert client.get("/api/assets", params={"text": "LINUX"}).json()["total"] == 1
+    assert client.get("/api/assets", params={"availability": "reserved"}).json()[
+        "items"
+    ][0] == {**beta, "availability": "reserved"}
+    available_items = client.get(
+        "/api/assets", params={"availability": "available"}
+    ).json()["items"]
+    assert len(available_items) == 2
+    assert {item["availability"] for item in available_items} == {"available"}
 
     updated = client.patch(
         f"/api/assets/{laptop['id']}",
@@ -156,6 +167,18 @@ def test_asset_api_roles_filters_pagination_archival_and_credentials(
     assert client.post(f"/api/assets/{laptop['id']}/reactivate").status_code == 409
 
 
+def test_asset_response_metadata_removes_legacy_credential_like_keys() -> None:
+    metadata = {
+        "host": "lab",
+        "password": "nope",
+        "nested": {"api-token": "nope"},
+    }
+    assert _safe_metadata(metadata) == {
+        "host": "lab",
+        "nested": {},
+    }
+
+
 def _create(
     client: TestClient, group_id: str, name: str, asset_type: str, description: str
 ) -> dict[str, object]:
@@ -185,3 +208,24 @@ def _groups(factory: async_sessionmaker[AsyncSession]) -> tuple[str, str, str]:
             return str(lab.id), str(other.id), str(archived.id)
 
     return asyncio.run(create_groups())
+
+
+def _reserve_now(factory: async_sessionmaker[AsyncSession], asset_id: str) -> None:
+    async def create_reservation() -> None:
+        async with factory() as session:
+            user = User(
+                oidc_issuer="https://issuer.example", oidc_subject="catalogue-test"
+            )
+            now = utc_now()
+            session.add(user)
+            session.add(
+                Reservation(
+                    asset_id=uuid.UUID(asset_id),
+                    user=user,
+                    starts_at=now - timedelta(minutes=1),
+                    ends_at=now + timedelta(minutes=1),
+                )
+            )
+            await session.commit()
+
+    asyncio.run(create_reservation())

@@ -19,7 +19,14 @@ export const routes: Routes = [
     canActivate: [groupAccessGuard],
     data: { title: 'Assets' },
     loadComponent: () =>
-      import('./features/placeholder/placeholder.page').then((module) => module.PlaceholderPage),
+      import('./features/assets/asset-catalogue.page').then((module) => module.AssetCataloguePage),
+  },
+  {
+    path: 'assets/:assetId',
+    canActivate: [groupAccessGuard],
+    data: { title: 'Asset details' },
+    loadComponent: () =>
+      import('./features/assets/asset-detail.page').then((module) => module.AssetDetailPage),
   },
   {
     path: 'administration',

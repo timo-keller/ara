@@ -11,6 +11,7 @@ from ara.api.routers.auth import require_csrf
 from ara.api.routers.groups import get_audit_context, get_effective_roles
 from ara.api.schemas.assets import (
     AssetCreateSchema,
+    AssetListItemSchema,
     AssetListSchema,
     AssetSchema,
     AssetUpdateSchema,
@@ -23,6 +24,10 @@ from ara.services.authorization import EffectiveRoles
 
 def _asset_schema(asset: object) -> AssetSchema:
     return AssetSchema.model_validate(asset, from_attributes=True)
+
+
+def _asset_list_item_schema(asset: object) -> AssetListItemSchema:
+    return AssetListItemSchema.model_validate(asset, from_attributes=True)
 
 
 @api_router.post(
@@ -46,6 +51,7 @@ async def list_assets(
     group_id: uuid.UUID | None = None,
     asset_type: str | None = None,
     text: str | None = None,
+    availability: Annotated[str | None, Query(pattern="^(available|reserved)$")] = None,
     archived: bool | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -55,12 +61,13 @@ async def list_assets(
         group_id=group_id,
         asset_type=asset_type,
         text=text,
+        availability=availability,
         archived=archived,
         offset=offset,
         limit=limit,
     )
     return AssetListSchema(
-        items=[_asset_schema(asset) for asset in assets],
+        items=[_asset_list_item_schema(asset) for asset in assets],
         total=total,
         offset=offset,
         limit=limit,

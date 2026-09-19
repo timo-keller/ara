@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ara.domain.models import Asset
+from ara.domain.models import Asset, Reservation, ReservationStatus, utc_now
 
 
 class AssetDAO:
@@ -29,10 +29,11 @@ class AssetDAO:
         group_id: uuid.UUID | None,
         asset_type: str | None,
         text: str | None,
+        availability: str | None,
         archived: bool | None,
         offset: int,
         limit: int,
-    ) -> tuple[list[Asset], int]:
+    ) -> tuple[list[tuple[Asset, bool]], int]:
         """Return a stable page and total without applying access rules."""
         filters = []
         if group_ids is not None:
@@ -46,15 +47,30 @@ class AssetDAO:
             filters.append(
                 or_(Asset.name.ilike(pattern), Asset.description.ilike(pattern))
             )
+        now = utc_now()
+        reserved_now = (
+            select(Reservation.id)
+            .where(
+                Reservation.asset_id == Asset.id,
+                Reservation.status == ReservationStatus.ACTIVE,
+                Reservation.starts_at <= now,
+                or_(Reservation.ends_at.is_(None), Reservation.ends_at > now),
+            )
+            .exists()
+        )
+        if availability is not None:
+            filters.append(
+                reserved_now if availability == "reserved" else ~reserved_now
+            )
         if archived is True:
             filters.append(Asset.archived_at.is_not(None))
         elif archived is False:
             filters.append(Asset.archived_at.is_(None))
-        statement = select(Asset).where(*filters)
+        statement = select(Asset, reserved_now.label("is_reserved")).where(*filters)
         total = await self.session.scalar(
             select(func.count()).select_from(statement.subquery())
         )
-        result = await self.session.scalars(
+        result = await self.session.execute(
             statement.order_by(Asset.name, Asset.id).offset(offset).limit(limit)
         )
-        return list(result), total or 0
+        return [(asset, is_reserved) for asset, is_reserved in result], total or 0

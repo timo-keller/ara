@@ -43,6 +43,7 @@ class AssetService:
         group_id: uuid.UUID | None,
         asset_type: str | None,
         text: str | None,
+        availability: str | None,
         archived: bool | None,
         offset: int,
         limit: int,
@@ -65,15 +66,21 @@ class AssetService:
                 effective_archived = False
         else:
             group_ids, effective_archived = set(), False
-        return await self.assets.list_assets(
+        rows, total = await self.assets.list_assets(
             group_ids=group_ids,
             group_id=group_id,
             asset_type=asset_type,
             text=text,
+            availability=availability,
             archived=effective_archived,
             offset=offset,
             limit=limit,
         )
+        assets = []
+        for asset, is_reserved in rows:
+            setattr(asset, "availability", "reserved" if is_reserved else "available")
+            assets.append(asset)
+        return assets, total
 
     async def get(self, actor_roles: EffectiveRoles, asset_id: uuid.UUID) -> Asset:
         asset = await self._get_required(asset_id)

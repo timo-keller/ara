@@ -1,0 +1,66 @@
+<section aria-labelledby="asset-heading">
+  <a routerLink="/assets">← Back to assets</a>
+  @if (state() === 'loading') {
+    <div class="state" aria-live="polite">
+      <syn-spinner></syn-spinner><span>Loading asset details…</span>
+    </div>
+  }
+  @if (state() === 'error') {
+    <syn-alert open variant="error" aria-live="assertive"
+      >This active asset is unavailable or could not be loaded.
+      <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
+    >
+  }
+  @if (state() === 'ready' && asset(); as current) {
+    <h1 id="asset-heading">{{ current.name }}</h1>
+    <p>
+      <syn-badge>{{ current.asset_type }}</syn-badge>
+    </p>
+    <p>{{ current.description || 'No description provided.' }}</p>
+    <div class="detail-grid">
+      <syn-card
+        ><h2 slot="header">Remote access</h2>
+        @if (current.remote_host) {
+          <p><strong>Host:</strong> {{ current.remote_host }}</p>
+        }
+        @if (safeRemoteUrl(current.remote_url); as remoteUrl) {
+          <p>
+            <strong>URL:</strong>
+            <a [href]="remoteUrl" rel="noopener noreferrer" target="_blank">{{ remoteUrl }}</a>
+          </p>
+        } @else if (current.remote_url) {
+          <p><strong>URL:</strong> {{ current.remote_url }}</p>
+        }
+        @if (current.operating_system) {
+          <p><strong>Operating system:</strong> {{ current.operating_system }}</p>
+        }
+        @if (current.access_instructions) {
+          <p><strong>Instructions:</strong> {{ current.access_instructions }}</p>
+        }
+        @if (
+          !current.remote_host &&
+          !current.remote_url &&
+          !current.operating_system &&
+          !current.access_instructions
+        ) {
+          <p>No remote-access metadata is available.</p>
+        }
+      </syn-card>
+      <syn-card
+        ><h2 slot="header">Upcoming reservations</h2>
+        @if (!reservations().length) {
+          <p>Available now — no active or upcoming reservations are scheduled.</p>
+        }
+        <ul>
+          @for (reservation of reservations(); track reservation.id) {
+            <li>
+              <strong>{{ reservation.starts_at | date: 'medium' }}</strong> to
+              {{ reservation.ends_at ? (reservation.ends_at | date: 'medium') : 'until returned' }}
+              ({{ reservation.status }})
+            </li>
+          }
+        </ul>
+      </syn-card>
+    </div>
+  }
+</section>

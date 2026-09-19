@@ -2,9 +2,15 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    StringConstraints,
+    field_serializer,
+    model_validator,
+)
 
 AssetName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
@@ -36,6 +42,22 @@ def _reject_credentials(value: object) -> object:
     elif isinstance(value, list):
         for nested_value in value:
             _reject_credentials(nested_value)
+    return value
+
+
+def _safe_metadata(value: Any) -> Any:
+    """Drop legacy credential-like metadata before it reaches an API response."""
+    if isinstance(value, dict):
+        return {
+            key: _safe_metadata(nested_value)
+            for key, nested_value in value.items()
+            if not any(
+                part in str(key).lower().replace("-", "_")
+                for part in _CREDENTIAL_KEY_PARTS
+            )
+        }
+    if isinstance(value, list):
+        return [_safe_metadata(nested_value) for nested_value in value]
     return value
 
 
@@ -95,9 +117,19 @@ class AssetSchema(BaseModel):
     updated_at: datetime
     archived_at: datetime | None
 
+    @field_serializer("operational_metadata")
+    def serialize_safe_metadata(
+        self, value: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        return _safe_metadata(value) if value is not None else None
+
+
+class AssetListItemSchema(AssetSchema):
+    availability: Literal["available", "reserved"]
+
 
 class AssetListSchema(BaseModel):
-    items: list[AssetSchema]
+    items: list[AssetListItemSchema]
     total: int
     offset: int
     limit: int

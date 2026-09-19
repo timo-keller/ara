@@ -1,0 +1,84 @@
+<section aria-labelledby="assets-heading">
+  <h1 id="assets-heading">Assets</h1>
+  <p>
+    Browse active assets available to your groups. Availability reflects reservations in progress
+    now.
+  </p>
+
+  <form class="filters" aria-label="Filter assets" (submit)="$event.preventDefault(); load()">
+    <syn-input
+      label="Search assets"
+      clearable
+      [value]="filters().text"
+      (valueChange)="changeFilter('text', $event)"
+    ></syn-input>
+    <syn-select
+      label="Group"
+      [value]="filters().groupId"
+      (valueChange)="changeSelectFilter('groupId', $event)"
+    >
+      <syn-option value="">All groups</syn-option>
+      @for (group of groups(); track group.id) {
+        <syn-option [value]="group.id">{{ group.name }}</syn-option>
+      }
+    </syn-select>
+    <syn-input
+      label="Type"
+      help-text="Enter the exact asset type."
+      [value]="filters().assetType"
+      (valueChange)="changeFilter('assetType', $event)"
+    ></syn-input>
+    <syn-select
+      label="Availability"
+      [value]="filters().availability"
+      (valueChange)="changeSelectFilter('availability', $event)"
+    >
+      <syn-option value="">All availability</syn-option
+      ><syn-option value="available">Available now</syn-option
+      ><syn-option value="reserved">Reserved now</syn-option>
+    </syn-select>
+  </form>
+
+  @if (state() === 'loading') {
+    <div class="state" aria-live="polite">
+      <syn-spinner></syn-spinner><span>Loading assets…</span>
+    </div>
+  }
+  @if (state() === 'error') {
+    <syn-alert open variant="error" aria-live="assertive"
+      >We could not load assets.
+      <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
+    >
+  }
+  @if (state() === 'ready' && !items().length) {
+    <p class="state" aria-live="polite">No active assets match these filters.</p>
+  }
+  @if (state() === 'ready' && items().length) {
+    <div class="asset-grid" aria-live="polite">
+      @for (asset of items(); track asset.id) {
+        <syn-card
+          ><h2 slot="header">
+            <a [routerLink]="['/assets', asset.id]">{{ asset.name }}</a>
+          </h2>
+          <p>
+            <syn-badge>{{ asset.asset_type }}</syn-badge>
+            <syn-badge>{{
+              asset.availability === 'available' ? 'Available now' : 'Reserved now'
+            }}</syn-badge>
+          </p>
+          <p>{{ asset.description || 'No description provided.' }}</p>
+          <a slot="footer" [routerLink]="['/assets', asset.id]">View details and reservations</a>
+        </syn-card>
+      }
+    </div>
+    <syn-pagination
+      aria-label="Asset catalogue pages"
+      [currentPage]="page()"
+      [pageSize]="filters().limit"
+      [pageSizeOptions]="[10, 25, 50]"
+      [totalItems]="total()"
+      (synPaginationPageChangedEvent)="changePage($event)"
+      (synPaginationPageSizeChangedEvent)="changePageSize($event)"
+    ></syn-pagination>
+  }
+</section>

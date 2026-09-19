@@ -1,0 +1,22 @@
+.filters,
+.asset-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin: 1.5rem 0;
+}
+.asset-grid syn-card {
+  display: block;
+  width: 100%;
+}
+.state {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  margin: 2rem 0;
+}
+@media (max-width: 36rem) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+}
