@@ -10,7 +10,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
     "lint": "ng lint",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "verify:production-output": "node scripts/verify-production-output.mjs"
   },
   "private": true,
   "packageManager": "npm@11.13.0",
@@ -21,6 +22,11 @@
     "@angular/forms": "^22.1.0",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "@synergy-design-system/angular": "3.24.5",
+    "@synergy-design-system/assets": "2.3.1",
+    "@synergy-design-system/components": "3.24.5",
+    "@synergy-design-system/fonts": "1.1.1",
+    "@synergy-design-system/tokens": "3.24.5",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -29,6 +35,7 @@
     "@angular/cli": "^22.1.8",
     "@angular/compiler-cli": "^22.1.0",
     "@eslint/js": "^10.0.1",
+    "@synergy-design-system/mcp": "4.13.0",
     "angular-eslint": "22.5.0",
     "eslint": "^10.9.1",
     "jsdom": "^28.0.0",

@@ -1,0 +1,29 @@
+{
+  "interface": "stdio",
+  "silent": true,
+  "logging": {
+    "localFile": {
+      "path": null
+    },
+    "stdout": {
+      "enabled": false
+    }
+  },
+  "tools": {
+    "componentInfo": {
+      "framework": "angular"
+    },
+    "intentComponentGuide": {
+      "framework": "angular"
+    },
+    "intentComponentValidate": {
+      "framework": "angular"
+    },
+    "intentOptions": {
+      "framework": "angular"
+    },
+    "intentTaskRecommendations": {
+      "framework": "angular"
+    }
+  }
+}

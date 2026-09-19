@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "synergy": {
+      "type": "local",
+      "enabled": true,
+      "cwd": ".",
+      "command": [
+        "node",
+        "frontend/node_modules/@synergy-design-system/mcp/dist/bin/start.js",
+        "--config",
+        "frontend/synergy-mcp.json",
+        "--interface",
+        "stdio",
+        "--silent"
+      ]
+    }
+  }
+}
