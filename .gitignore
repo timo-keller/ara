@@ -13,6 +13,8 @@ htmlcov/
 node_modules/
 dist/
 .angular/
+playwright-report/
+test-results/
 
 # Local application data and databases
 data/

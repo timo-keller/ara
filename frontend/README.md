@@ -38,6 +38,17 @@ roles, which control visible navigation only; the API remains authoritative.
 Unsafe same-origin requests send the `ara_csrf` double-submit cookie as
 `X-CSRF-Token`.
 
+## End-to-end tests
+
+Run `npm run test:e2e` after `npm install` and `npx playwright install chromium`.
+The command creates a temporary SQLite database, applies Alembic migrations,
+seeds only deterministic fixture data, and starts local FastAPI, Angular, and a
+minimal in-process OIDC provider. The provider generates an ephemeral signing
+key and performs the normal authorization-code, ID-token validation, secure
+cookie, CSRF, and server-side role-resolution flow; it uses no production
+credentials. Playwright traces, screenshots, videos, and service logs are kept
+under `test-results/` on failure (and logs after a run).
+
 ## Synergy Design System
 
 The frontend uses the Synergy 2025 light theme globally. Its SICK Intl fonts
