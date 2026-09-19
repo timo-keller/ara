@@ -33,6 +33,8 @@ export const routes: Routes = [
     canActivate: [ownerGuard],
     data: { title: 'Administration' },
     loadComponent: () =>
-      import('./features/placeholder/placeholder.page').then((module) => module.PlaceholderPage),
+      import('./features/administration/administration.page').then(
+        (module) => module.AdministrationPage,
+      ),
   },
 ];

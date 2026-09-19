@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { routes } from '../../app.routes';
 import { AuthService } from './auth.service';
-import { authenticatedGuard } from './auth.guard';
+import { authenticatedGuard, ownerGuard } from './auth.guard';
 
 describe('authenticatedGuard', () => {
   it('permits an already authenticated session', async () => {
@@ -19,5 +19,22 @@ describe('authenticatedGuard', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('redirects non-Owners away from administration routes', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter(routes)] });
+    const auth = TestBed.inject(AuthService);
+    (auth as unknown as { session: { set(value: unknown): void } }).session.set({
+      authenticated: true,
+      user: { id: 'user', display_name: null, email: null },
+      roles: { is_owner: false, group_roles: {} },
+    });
+    auth.state.set('authenticated');
+
+    const result = await TestBed.runInInjectionContext(() =>
+      firstValueFrom(ownerGuard({} as never, {} as never) as ReturnType<typeof auth.ensureSession>),
+    );
+
+    expect(result).not.toBe(true);
   });
 });

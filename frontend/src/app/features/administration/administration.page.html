@@ -1,0 +1,168 @@
+<section aria-labelledby="administration-heading">
+  <h1 id="administration-heading">Group administration</h1>
+  <p>Only Owners can administer groups and the role mappings that grant group access.</p>
+
+  @if (error()) {
+    <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
+  }
+
+  @if (archiveConflicts().length) {
+    <syn-alert open variant="warning" aria-live="assertive">
+      <strong>This group cannot be archived yet.</strong> Resolve every active reservation below,
+      then try again. Return an item when it is back, or cancel a reservation that will not go
+      ahead.
+      <ul>
+        @for (conflict of archiveConflicts(); track conflict.reservation_id) {
+          <li>
+            Reservation {{ conflict.reservation_id }} for asset {{ conflict.asset_id }}:
+            {{ conflict.resolution }}
+          </li>
+        }
+      </ul>
+    </syn-alert>
+  }
+
+  <div class="admin-grid">
+    <syn-card>
+      <h2 slot="header">{{ groupDraft().id ? 'Edit group' : 'Create group' }}</h2>
+      <form (submit)="$event.preventDefault(); saveGroup()">
+        <syn-input
+          label="Group name"
+          required
+          [value]="groupDraft().name"
+          (valueChange)="changeGroup('name', $event)"
+        ></syn-input>
+        <syn-textarea
+          label="Description"
+          [value]="groupDraft().description"
+          (valueChange)="changeGroup('description', $event)"
+        ></syn-textarea>
+        <syn-button type="submit" variant="filled">Save group</syn-button>
+      </form>
+    </syn-card>
+
+    <syn-card>
+      <h2 slot="header">{{ mappingDraft().id ? 'Edit role mapping' : 'Create role mapping' }}</h2>
+      <p>
+        A JMESPath expression is evaluated against your current sign-in claims and must return
+        <code>true</code> or <code>false</code>. For example,
+        <code>contains(groups, 'ara-lab-users')</code> matches when your <code>groups</code> claim
+        contains that value.
+      </p>
+      <form (submit)="$event.preventDefault(); saveMapping()">
+        <syn-select
+          label="Group"
+          [value]="mappingDraft().group_id"
+          (valueChange)="changeMapping('group_id', $event)"
+        >
+          <syn-option value="">Select a group</syn-option>
+          @for (group of groups(); track group.id) {
+            @if (!group.archived_at) {
+              <syn-option [value]="group.id">{{ group.name }}</syn-option>
+            }
+          }
+        </syn-select>
+        <syn-textarea
+          label="JMESPath expression"
+          required
+          [value]="mappingDraft().expression"
+          (valueChange)="changeMapping('expression', $event)"
+        ></syn-textarea>
+        <syn-select
+          label="Role"
+          [value]="mappingDraft().role"
+          (valueChange)="changeMapping('role', $event)"
+        >
+          <syn-option value="user">User</syn-option>
+          <syn-option value="group_admin">Group admin</syn-option>
+        </syn-select>
+        <syn-input
+          label="Priority"
+          type="number"
+          min="0"
+          [value]="mappingDraft().priority"
+          (valueChange)="changeMapping('priority', $event)"
+        ></syn-input>
+        <div class="actions">
+          <syn-button type="submit" variant="filled">Save mapping</syn-button>
+          <syn-button type="button" variant="outline" (click)="testMapping()"
+            >Test expression</syn-button
+          >
+        </div>
+      </form>
+      <p class="test-note">Testing never saves this draft or exposes your claims.</p>
+      @if (testResult() !== null) {
+        <syn-alert open [variant]="testResult() ? 'success' : 'neutral'" aria-live="polite">
+          This expression {{ testResult() ? 'matches' : 'does not match' }} your current sign-in
+          claims.
+        </syn-alert>
+      }
+    </syn-card>
+  </div>
+
+  @if (state() === 'loading') {
+    <p class="state" aria-live="polite"><syn-spinner></syn-spinner> Loading administration data…</p>
+  } @else if (state() === 'error') {
+    <syn-alert open variant="error"
+      >We could not load administration data.
+      <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
+    >
+  } @else {
+    <div class="lists">
+      <section aria-labelledby="groups-heading">
+        <h2 id="groups-heading">Groups</h2>
+        @if (!groups().length) {
+          <p>No groups have been created.</p>
+        } @else {
+          @for (group of groups(); track group.id) {
+            <article class="list-item">
+              <div>
+                <strong>{{ group.name }}</strong
+                ><br />{{ group.description || 'No description.' }}
+              </div>
+              <div class="actions">
+                <syn-button type="button" variant="outline" (click)="editGroup(group)"
+                  >Edit</syn-button
+                >
+                @if (group.archived_at) {
+                  <syn-button type="button" (click)="reactivateGroup(group)">Reactivate</syn-button>
+                } @else {
+                  <syn-button type="button" variant="outline" (click)="archiveGroup(group)"
+                    >Archive</syn-button
+                  >
+                }
+              </div>
+            </article>
+          }
+        }
+      </section>
+      <section aria-labelledby="mappings-heading">
+        <h2 id="mappings-heading">Role mappings</h2>
+        @if (!mappings().length) {
+          <p>No active role mappings have been created.</p>
+        } @else {
+          @for (mapping of mappings(); track mapping.id) {
+            <article class="list-item">
+              <div>
+                <strong>{{ groupName(mapping.group_id) }} · {{ mapping.role }}</strong>
+                <br /><code>{{ mapping.expression }}</code
+                ><br />Priority {{ mapping.priority }} ·
+                {{ mapping.enabled ? 'Enabled' : 'Disabled' }}
+              </div>
+              <div class="actions">
+                <syn-button type="button" variant="outline" (click)="editMapping(mapping)"
+                  >Edit</syn-button
+                >
+                @if (mapping.enabled) {
+                  <syn-button type="button" variant="outline" (click)="disableMapping(mapping)"
+                    >Disable</syn-button
+                  >
+                }
+              </div>
+            </article>
+          }
+        }
+      </section>
+    </div>
+  }
+</section>

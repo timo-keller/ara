@@ -75,6 +75,13 @@ async def test_group_service_enforces_access_and_preserves_blocked_archive(
     with pytest.raises(DomainError, match="Group has unresolved reservations") as error:
         await service.archive(owner, group.id)
     assert error.value.status_code == 409
+    assert error.value.details == [
+        {
+            "reservation_id": str(reservation.id),
+            "asset_id": str(asset.id),
+            "resolution": "Return or cancel this reservation before archiving.",
+        }
+    ]
     await database_session.refresh(group)
     assert group.archived_at is None
     assert await database_session.get(Asset, asset.id) is not None

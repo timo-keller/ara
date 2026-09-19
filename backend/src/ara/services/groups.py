@@ -97,10 +97,21 @@ class GroupService:
         group = await self._get_required(group_id)
         if group.archived_at is None:
             if await self.groups.has_unresolved_reservations(group_id):
+                reservations = await self.groups.unresolved_reservations(group_id)
                 raise DomainError(
                     "group_has_unresolved_reservations",
                     "Group has unresolved reservations",
                     status_code=409,
+                    details=[
+                        {
+                            "reservation_id": str(reservation_id),
+                            "asset_id": str(asset_id),
+                            "resolution": (
+                                "Return or cancel this reservation before archiving."
+                            ),
+                        }
+                        for reservation_id, asset_id in reservations
+                    ],
                 )
             before = group_snapshot(group)
             group.archived_at = utc_now()

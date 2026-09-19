@@ -57,3 +57,20 @@ class GroupDAO:
             )
         )
         return bool(await self.session.scalar(statement))
+
+    async def unresolved_reservations(
+        self, group_id: uuid.UUID
+    ) -> list[tuple[uuid.UUID, uuid.UUID]]:
+        """Return active reservation and asset identifiers blocking archival."""
+        result = await self.session.execute(
+            select(Reservation.id, Asset.id)
+            .join(Asset, Reservation.asset_id == Asset.id)
+            .where(
+                Asset.group_id == group_id,
+                Reservation.status == ReservationStatus.ACTIVE,
+            )
+            .order_by(Reservation.starts_at, Reservation.id)
+        )
+        return [
+            (reservation_id, asset_id) for reservation_id, asset_id in result.tuples()
+        ]
