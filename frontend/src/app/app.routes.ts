@@ -12,7 +12,7 @@ export const routes: Routes = [
     canActivate: [authenticatedGuard],
     data: { title: 'Reservations' },
     loadComponent: () =>
-      import('./features/placeholder/placeholder.page').then((module) => module.PlaceholderPage),
+      import('./features/reservations/reservations.page').then((module) => module.ReservationsPage),
   },
   {
     path: 'assets',

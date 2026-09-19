@@ -1,0 +1,90 @@
+<section aria-labelledby="reservations-heading">
+  <h1 id="reservations-heading">My reservations</h1>
+  @if (success()) {
+    <syn-alert open variant="success" aria-live="polite">{{ success() }}</syn-alert>
+  }
+  @if (error()) {
+    <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
+  }
+  @if (state() === 'loading') {
+    <div class="state" aria-live="polite">
+      <syn-spinner></syn-spinner><span>Loading reservations…</span>
+    </div>
+  } @else if (state() === 'error') {
+    <syn-alert open variant="error"
+      >Reservations could not be loaded.
+      <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
+    >
+  } @else if (!reservations().length) {
+    <p>You do not have any reservations.</p>
+  } @else {
+    <div class="reservation-list">
+      @for (reservation of reservations(); track reservation.id) {
+        <syn-card>
+          <h2 slot="header">
+            Asset <a [routerLink]="['/assets', reservation.asset_id]">{{ reservation.asset_id }}</a>
+          </h2>
+          <p>
+            <syn-badge>{{ reservation.status }}</syn-badge>
+          </p>
+          <p>
+            {{ reservation.starts_at | date: 'medium' }} to
+            {{ reservation.ends_at ? (reservation.ends_at | date: 'medium') : 'until returned' }}
+          </p>
+          <div class="actions">
+            @if (canExtend(reservation)) {
+              <syn-button type="button" (click)="openExtension(reservation)">Extend</syn-button>
+            }
+            @if (allowedActions().get(reservation.id)?.includes('return')) {
+              <syn-button type="button" (click)="confirm('return', reservation)"
+                >Return asset</syn-button
+              >
+            }
+            @if (allowedActions().get(reservation.id)?.includes('cancel')) {
+              <syn-button type="button" (click)="confirm('cancel', reservation)"
+                >Cancel reservation</syn-button
+              >
+            }
+          </div>
+        </syn-card>
+      }
+    </div>
+  }
+  <syn-dialog
+    label="Extend reservation"
+    [open]="!!extensionFor()"
+    (synRequestCloseEvent)="extensionFor.set(null)"
+  >
+    <p>Enter a later end time in your local time. It will be sent as UTC.</p>
+    <syn-input
+      label="New end"
+      type="datetime-local"
+      [value]="extensionEnd()"
+      (synChangeEvent)="extensionEnd.set($any($event.target).value)"
+    ></syn-input>
+    <div slot="footer" class="actions">
+      <syn-button type="button" variant="text" (click)="extensionFor.set(null)">Cancel</syn-button
+      ><syn-button type="button" variant="filled" (click)="extend()">Extend</syn-button>
+    </div>
+  </syn-dialog>
+  <syn-dialog
+    label="Confirm reservation change"
+    [open]="!!pendingAction()"
+    (synRequestCloseEvent)="pendingAction.set(null)"
+  >
+    <p>
+      @if (pendingAction()?.action === 'return') {
+        Returning makes this asset available immediately.
+      } @else {
+        Cancelling removes your future reservation and makes that time available to others.
+      }
+    </p>
+    <div slot="footer" class="actions">
+      <syn-button type="button" variant="text" (click)="pendingAction.set(null)"
+        >Keep reservation</syn-button
+      ><syn-button type="button" variant="filled" (click)="performConfirmedAction()"
+        >Confirm</syn-button
+      >
+    </div>
+  </syn-dialog>
+</section>

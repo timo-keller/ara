@@ -17,6 +17,12 @@
       <syn-badge>{{ current.asset_type }}</syn-badge>
     </p>
     <p>{{ current.description || 'No description provided.' }}</p>
+    @if (reservationSuccess()) {
+      <syn-alert open variant="success" aria-live="polite">{{ reservationSuccess() }}</syn-alert>
+    }
+    @if (reservationError()) {
+      <syn-alert open variant="error" aria-live="assertive">{{ reservationError() }}</syn-alert>
+    }
     <div class="detail-grid">
       <syn-card
         ><h2 slot="header">Remote access</h2>
@@ -46,6 +52,34 @@
           <p>No remote-access metadata is available.</p>
         }
       </syn-card>
+      <syn-card>
+        <h2 slot="header">Reserve this asset</h2>
+        <p>Times are entered in your local time and sent as UTC.</p>
+        <div class="reservation-form">
+          <syn-input
+            label="Start"
+            type="datetime-local"
+            required
+            [value]="startsAt()"
+            (synChangeEvent)="startsAt.set($any($event.target).value)"
+          ></syn-input>
+          <syn-button type="button" variant="text" (click)="selectNow()">Start now</syn-button>
+          <syn-input
+            label="End (optional)"
+            type="datetime-local"
+            [value]="endsAt()"
+            helpText="Leave blank only if you will return the asset manually."
+            (synChangeEvent)="endsAt.set($any($event.target).value)"
+          ></syn-input>
+          <syn-button
+            type="button"
+            variant="filled"
+            [loading]="reserving()"
+            (click)="submitReservation()"
+            >Reserve</syn-button
+          >
+        </div>
+      </syn-card>
       <syn-card
         ><h2 slot="header">Upcoming reservations</h2>
         @if (!reservations().length) {
@@ -62,5 +96,20 @@
         </ul>
       </syn-card>
     </div>
+    <syn-dialog
+      label="Confirm open-ended reservation"
+      [open]="openEndedConfirmationOpen()"
+      (synRequestCloseEvent)="cancelOpenEndedConfirmation()"
+    >
+      <p>This reservation has no end time and will hold the asset until you return it.</p>
+      <div slot="footer" class="dialog-actions">
+        <syn-button type="button" variant="text" (click)="cancelOpenEndedConfirmation()"
+          >Go back</syn-button
+        >
+        <syn-button type="button" variant="filled" (click)="confirmOpenEndedReservation()"
+          >Confirm reservation</syn-button
+        >
+      </div>
+    </syn-dialog>
   }
 </section>

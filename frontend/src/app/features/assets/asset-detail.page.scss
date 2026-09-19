@@ -14,3 +14,12 @@
   gap: 0.75rem;
   margin: 2rem 0;
 }
+.reservation-form {
+  display: grid;
+  gap: 0.75rem;
+}
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

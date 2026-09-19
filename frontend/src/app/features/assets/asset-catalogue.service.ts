@@ -45,9 +45,20 @@ export interface Group {
 
 export interface Reservation {
   id: string;
+  asset_id: string;
   starts_at: string;
   ends_at: string | null;
   status: 'active' | 'returned' | 'cancelled' | 'ended';
+}
+
+export interface ReservationCreate {
+  asset_id: string;
+  starts_at: string;
+  ends_at?: string;
+}
+
+export interface ReservationExtension {
+  ends_at: string;
 }
 
 export function assetQuery(filters: AssetFilters): HttpParams {
@@ -82,5 +93,25 @@ export class AssetCatalogueService {
     return this.http.get<{ items: Reservation[] }>(`/api/assets/${assetId}/reservations`, {
       params: new HttpParams().set('limit', 10),
     });
+  }
+
+  mine() {
+    return this.http.get<{ items: Reservation[] }>('/api/reservations/mine');
+  }
+
+  createReservation(payload: ReservationCreate) {
+    return this.http.post<Reservation>('/api/reservations', payload);
+  }
+
+  extendReservation(reservationId: string, payload: ReservationExtension) {
+    return this.http.post<Reservation>(`/api/reservations/${reservationId}/extend`, payload);
+  }
+
+  returnReservation(reservationId: string) {
+    return this.http.post<Reservation>(`/api/reservations/${reservationId}/return`, {});
+  }
+
+  cancelReservation(reservationId: string) {
+    return this.http.post<Reservation>(`/api/reservations/${reservationId}/cancel`, {});
   }
 }
