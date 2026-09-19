@@ -148,6 +148,60 @@ def test_reservation_api_creation_access_schedule_and_pagination(
     assert schedule["items"][0]["id"] == created.json()["id"]
 
 
+def test_reservation_lifecycle_api_routes(
+    reservation_api_client: ApiClient,
+) -> None:
+    client, factory, user, roles = reservation_api_client
+    lab, _, _, laptop, _ = _fixtures(factory)
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(lab): GroupRole.USER}
+    )
+    now = datetime.now(UTC)
+    current = client.post(
+        "/api/reservations",
+        json={
+            "asset_id": laptop,
+            "starts_at": (now - timedelta(seconds=30)).isoformat(),
+            "ends_at": (now + timedelta(hours=1)).isoformat(),
+        },
+    )
+    assert current.status_code == 201
+    reservation_id = current.json()["id"]
+    extended = client.post(
+        f"/api/reservations/{reservation_id}/extend",
+        json={"ends_at": (now + timedelta(hours=2)).isoformat()},
+    )
+    assert extended.status_code == 200
+    assert extended.json()["status"] == "active"
+    returned = client.post(f"/api/reservations/{reservation_id}/return")
+    assert returned.status_code == 200
+    assert returned.json()["status"] == "returned"
+    assert client.post(f"/api/reservations/{reservation_id}/return").status_code == 409
+
+    future = client.post(
+        "/api/reservations",
+        json={
+            "asset_id": laptop,
+            "starts_at": (now + timedelta(hours=3)).isoformat(),
+            "ends_at": (now + timedelta(hours=4)).isoformat(),
+        },
+    )
+    assert future.status_code == 201
+    cancelled = client.post(f"/api/reservations/{future.json()['id']}/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    assert (
+        client.post(
+            f"/api/reservations/{future.json()['id']}/extend",
+            json={"ends_at": (now + timedelta(hours=5)).isoformat()},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(f"/api/reservations/{future.json()['id']}/end").status_code == 403
+    )
+
+
 @pytest.mark.asyncio
 async def test_current_user_creation_checks_group_and_asset_inside_write_transaction(
     tmp_path,

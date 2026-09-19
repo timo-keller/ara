@@ -29,6 +29,22 @@ class ReservationCreateSchema(BaseModel):
         return self
 
 
+class ReservationExtensionSchema(BaseModel):
+    """A later end time for a bounded reservation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ends_at: datetime
+
+    @model_validator(mode="after")
+    def requires_utc_end(self) -> ReservationExtensionSchema:
+        if self.ends_at.tzinfo is None or self.ends_at.utcoffset() != UTC.utcoffset(
+            self.ends_at
+        ):
+            raise ValueError("ends_at must be timezone-aware UTC")
+        return self
+
+
 class ReservationSchema(BaseModel):
     id: uuid.UUID
     asset_id: uuid.UUID

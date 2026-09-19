@@ -19,6 +19,10 @@ class ReservationDAO:
         """Stage a reservation for the caller's service transaction."""
         self.session.add(reservation)
 
+    async def get_by_id(self, reservation_id: uuid.UUID) -> Reservation | None:
+        """Return a reservation by identifier without applying access policy."""
+        return await self.session.get(Reservation, reservation_id)
+
     async def list_for_user(
         self, *, user_id: uuid.UUID, offset: int, limit: int
     ) -> tuple[list[Reservation], int]:

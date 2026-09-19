@@ -11,6 +11,7 @@ from ara.api.routers.auth import require_authenticated_user, require_csrf
 from ara.api.routers.groups import get_effective_roles
 from ara.api.schemas.reservations import (
     ReservationCreateSchema,
+    ReservationExtensionSchema,
     ReservationListSchema,
     ReservationSchema,
 )
@@ -38,6 +39,69 @@ async def create_reservation(
 ) -> ReservationSchema:
     reservation = await ReservationService(session).create_for_current_user(
         roles, user_id=user.id, **payload.model_dump()
+    )
+    return _reservation_schema(reservation)
+
+
+@api_router.post(
+    "/reservations/{reservation_id}/extend", response_model=ReservationSchema
+)
+async def extend_reservation(
+    reservation_id: uuid.UUID,
+    payload: ReservationExtensionSchema,
+    user: Annotated[User, Depends(require_authenticated_user)],
+    roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
+    _csrf: Annotated[None, Depends(require_csrf)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReservationSchema:
+    reservation = await ReservationService(session).extend_own(
+        roles, actor_id=user.id, reservation_id=reservation_id, ends_at=payload.ends_at
+    )
+    return _reservation_schema(reservation)
+
+
+@api_router.post(
+    "/reservations/{reservation_id}/return", response_model=ReservationSchema
+)
+async def return_reservation(
+    reservation_id: uuid.UUID,
+    user: Annotated[User, Depends(require_authenticated_user)],
+    roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
+    _csrf: Annotated[None, Depends(require_csrf)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReservationSchema:
+    reservation = await ReservationService(session).return_own(
+        roles, actor_id=user.id, reservation_id=reservation_id
+    )
+    return _reservation_schema(reservation)
+
+
+@api_router.post(
+    "/reservations/{reservation_id}/cancel", response_model=ReservationSchema
+)
+async def cancel_reservation(
+    reservation_id: uuid.UUID,
+    user: Annotated[User, Depends(require_authenticated_user)],
+    roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
+    _csrf: Annotated[None, Depends(require_csrf)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReservationSchema:
+    reservation = await ReservationService(session).cancel(
+        roles, actor_id=user.id, reservation_id=reservation_id
+    )
+    return _reservation_schema(reservation)
+
+
+@api_router.post("/reservations/{reservation_id}/end", response_model=ReservationSchema)
+async def end_reservation(
+    reservation_id: uuid.UUID,
+    user: Annotated[User, Depends(require_authenticated_user)],
+    roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
+    _csrf: Annotated[None, Depends(require_csrf)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReservationSchema:
+    reservation = await ReservationService(session).end_administratively(
+        roles, actor_id=user.id, reservation_id=reservation_id
     )
     return _reservation_schema(reservation)
 

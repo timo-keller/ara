@@ -103,3 +103,16 @@ chronologically. Both lists use `offset` and `limit` pagination and a stable
 identifier tie-breaker. Creation rejects archived groups or assets and requires
 UTC timestamps (`Z` or `+00:00`). Self-service starts must be now or future;
 a one-minute grace period accommodates an immediate browser timestamp in transit.
+
+`POST /api/reservations/{id}/extend` extends the authenticated user's bounded
+active reservation to a strictly later UTC `ends_at`; the full revised interval
+is checked under the same `BEGIN IMMEDIATE` lock as creation.  Open-ended and
+terminal reservations cannot be extended. `POST /api/reservations/{id}/return`
+returns only the authenticated user's reservation after it has started and
+before its scheduled end. `POST /api/reservations/{id}/cancel` cancels only a
+future reservation: its owner may cancel it, as may an Owner or Group Admin for
+the asset's group. `POST /api/reservations/{id}/end` ends a currently active
+reservation and is restricted to those administrators. At the exact start time
+a reservation is no longer future for cancellation and is returnable/endable;
+at its exact end it is no longer returnable/endable. All lifecycle POST routes
+require CSRF and reject terminal/repeated operations with `409`.
