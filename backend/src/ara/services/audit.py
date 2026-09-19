@@ -2,13 +2,21 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.daos.audit import AuditDAO
-from ara.domain.models import Asset, AuditEvent, Group, Reservation, RoleMapping
+from ara.domain.models import (
+    Asset,
+    AuditEvent,
+    Group,
+    GroupRole,
+    Reservation,
+    RoleMapping,
+)
+from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
 @dataclass(frozen=True)
@@ -106,3 +114,61 @@ class AuditService:
                 correlation_id=self.context.correlation_id,
             )
         )
+
+    async def list_events(
+        self,
+        actor_roles: EffectiveRoles,
+        *,
+        group_id: uuid.UUID | None,
+        actor_id: uuid.UUID | None,
+        action: str | None,
+        target_type: str | None,
+        target_id: str | None,
+        created_at_from: datetime | None,
+        created_at_to: datetime | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[AuditEvent], int]:
+        """List audit history within the caller's administrative group scope."""
+        self._validate_time_range(created_at_from, created_at_to)
+        if actor_roles.is_owner:
+            group_ids = None
+        else:
+            group_ids = {
+                candidate_id
+                for candidate_id, role in actor_roles.group_roles.items()
+                if role is GroupRole.GROUP_ADMIN
+            }
+            if not group_ids:
+                AuthorizationService.require_owner(actor_roles)
+        return await self.events.list_events(
+            group_ids=group_ids,
+            group_id=group_id,
+            actor_id=actor_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            created_at_from=created_at_from,
+            created_at_to=created_at_to,
+            offset=offset,
+            limit=limit,
+        )
+
+    @staticmethod
+    def _validate_time_range(
+        created_at_from: datetime | None, created_at_to: datetime | None
+    ) -> None:
+        for name, value in (
+            ("created_at_from", created_at_from),
+            ("created_at_to", created_at_to),
+        ):
+            if value is not None and (
+                value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value)
+            ):
+                raise ValueError(f"{name} must be timezone-aware UTC")
+        if (
+            created_at_from is not None
+            and created_at_to is not None
+            and created_at_from > created_at_to
+        ):
+            raise ValueError("created_at_from must be before or equal to created_at_to")

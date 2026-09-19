@@ -116,3 +116,12 @@ reservation and is restricted to those administrators. At the exact start time
 a reservation is no longer future for cancellation and is returnable/endable;
 at its exact end it is no longer returnable/endable. All lifecycle POST routes
 require CSRF and reject terminal/repeated operations with `409`.
+
+## Audit API
+
+`GET /api/audit-events` returns reverse-chronological audit history with a
+deterministic event-identifier tie-breaker. It accepts `group_id`, `actor_id`,
+`action`, `target_type`, `target_id`, `created_at_from`, `created_at_to`,
+`offset`, and `limit` filters; time values must be UTC. Owners can query all
+events, while Group Admins see only events associated with their administered
+groups. Users are denied access.

@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
 
     # Importing routers registers their routes on the shared router instances.
     import ara.api.routers.assets  # noqa: F401
+    import ara.api.routers.audit  # noqa: F401
     import ara.api.routers.auth  # noqa: F401
     import ara.api.routers.groups  # noqa: F401
     import ara.api.routers.health  # noqa: F401
