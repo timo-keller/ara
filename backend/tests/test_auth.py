@@ -36,14 +36,18 @@ class MockProvider(oidc.OidcClient):
     def __init__(self, configured_settings: Settings) -> None:
         super().__init__(configured_settings)
         self.nonce: str | None = None
+        self.end_session_endpoint: str | None = None
 
     async def discover(self) -> dict[str, str]:
-        return {
+        metadata = {
             "issuer": "https://id.example.test/realm",
             "authorization_endpoint": "https://id.example.test/authorize",
             "token_endpoint": "https://id.example.test/token",
             "jwks_uri": "https://id.example.test/keys",
         }
+        if self.end_session_endpoint:
+            metadata["end_session_endpoint"] = self.end_session_endpoint
+        return metadata
 
     async def exchange_code(self, code: str, metadata: Mapping[str, str]) -> str:
         assert code == "authorization-code"
@@ -153,8 +157,11 @@ def test_oidc_login_callback_session_and_logout(
     logout = client.post(
         "/auth/logout", headers={auth.CSRF_HEADER: client.cookies[auth.CSRF_COOKIE]}
     )
-    assert logout.status_code == 204
+    assert logout.status_code == 200
+    assert logout.json() == {"provider_logout_url": None}
     assert 'ara_session=""' in logout.headers["set-cookie"]
+    assert 'ara_oidc_state=""' in logout.headers["set-cookie"]
+    assert 'ara_csrf=""' in logout.headers["set-cookie"]
     assert client.get("/auth/session").json() == {"authenticated": False}
 
 
@@ -198,6 +205,27 @@ def test_callback_failure_is_safe_and_does_not_leak_provider_values(
         "message": "Authentication failed",
     }
     assert "provider-id-token" not in response.text
+    assert "provider-client-secret" not in response.text
+
+
+def test_logout_returns_only_the_fixed_provider_return_url(
+    authenticated_client: AuthenticatedClient,
+) -> None:
+    client, provider, _session_factory = authenticated_client
+    provider.end_session_endpoint = "https://id.example.test/realm/logout?client=ara"
+    _login(client)
+
+    response = client.post(
+        "/auth/logout", headers={auth.CSRF_HEADER: client.cookies[auth.CSRF_COOKIE]}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider_logout_url": (
+            "https://id.example.test/realm/logout?client=ara&"
+            "client_id=ara&post_logout_redirect_uri=https%3A%2F%2Fara.example.test%2F"
+        )
+    }
     assert "provider-client-secret" not in response.text
 
 
@@ -260,7 +288,7 @@ def test_expired_and_revoked_sessions_are_rejected(
     csrf_token = client.cookies[auth.CSRF_COOKIE]
     session_cookie = client.cookies[auth.SESSION_COOKIE]
     logout = client.post("/auth/logout", headers={auth.CSRF_HEADER: csrf_token})
-    assert logout.status_code == 204
+    assert logout.status_code == 200
     response = client.post(
         "/auth/logout",
         headers={auth.CSRF_HEADER: csrf_token},

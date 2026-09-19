@@ -68,6 +68,17 @@ class OidcClient:
                 status_code=503,
             )
         result = {key: metadata[key] for key in required}
+        end_session_endpoint = metadata.get("end_session_endpoint")
+        if end_session_endpoint is not None:
+            if not isinstance(end_session_endpoint, str) or not end_session_endpoint:
+                raise DomainError(
+                    "authentication_unavailable",
+                    "The identity provider is unavailable",
+                    status_code=503,
+                )
+            result["end_session_endpoint"] = self._public_browser_endpoint(
+                end_session_endpoint
+            )
         if self.settings.oidc_backchannel_url is not None:
             for key in ("token_endpoint", "jwks_uri"):
                 result[key] = self._backchannel_endpoint(result[key])
@@ -96,6 +107,26 @@ class OidcClient:
         return urlunsplit(
             (backchannel.scheme, backchannel.netloc, candidate.path, "", "")
         )
+
+    def _public_browser_endpoint(self, endpoint: str) -> str:
+        """Accept only a browser endpoint below the configured public issuer."""
+        issuer = urlsplit(str(self.settings.oidc_issuer_url).rstrip("/"))
+        candidate = urlsplit(endpoint)
+        issuer_path = issuer.path.rstrip("/")
+        if (
+            candidate.scheme != issuer.scheme
+            or candidate.netloc != issuer.netloc
+            or not candidate.path.startswith(f"{issuer_path}/")
+            or candidate.fragment
+            or candidate.username
+            or candidate.password
+        ):
+            raise DomainError(
+                "authentication_unavailable",
+                "The identity provider is unavailable",
+                status_code=503,
+            )
+        return endpoint
 
     async def exchange_code(self, code: str, metadata: Mapping[str, str]) -> str:
         try:

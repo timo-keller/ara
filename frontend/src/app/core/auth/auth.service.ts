@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { InjectionToken, Injectable, computed, inject, signal } from '@angular/core';
 import { catchError, map, of, tap } from 'rxjs';
 
 export type GroupRole = 'user' | 'group_admin';
@@ -21,6 +21,14 @@ export interface SessionResponse {
   roles?: EffectiveRoles;
 }
 
+export interface LogoutResponse {
+  provider_logout_url: string | null;
+}
+
+export const BROWSER_LOCATION = new InjectionToken<Pick<Location, 'assign'>>('browser location', {
+  factory: () => window.location,
+});
+
 export type AuthenticationState = 'loading' | 'anonymous' | 'authenticated' | 'error' | 'expired';
 
 @Injectable({ providedIn: 'root' })
@@ -39,6 +47,7 @@ export class AuthService {
   );
 
   private readonly http = inject(HttpClient);
+  private readonly browserLocation = inject(BROWSER_LOCATION);
 
   loadSession() {
     this.state.set('loading');
@@ -64,11 +73,14 @@ export class AuthService {
   }
 
   logout() {
-    return this.http.post<void>('/auth/logout', null, { withCredentials: true }).pipe(
-      tap(() => this.reset()),
+    return this.http.post<LogoutResponse>('/auth/logout', null, { withCredentials: true }).pipe(
+      tap((result) => {
+        this.reset();
+        if (result.provider_logout_url) this.browserLocation.assign(result.provider_logout_url);
+      }),
       catchError(() => {
         this.reset();
-        return of(undefined);
+        return of({ provider_logout_url: null });
       }),
     );
   }

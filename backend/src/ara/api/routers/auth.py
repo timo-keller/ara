@@ -14,7 +14,12 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.api.routers import auth_router
-from ara.api.schemas.auth import EffectiveRolesSchema, SessionSchema, SessionUserSchema
+from ara.api.schemas.auth import (
+    EffectiveRolesSchema,
+    LogoutSchema,
+    SessionSchema,
+    SessionUserSchema,
+)
 from ara.core.config import get_settings
 from ara.core.errors import DomainError
 from ara.domain.models import ApplicationSession, User
@@ -252,14 +257,33 @@ async def current_session(
     )
 
 
-@auth_router.post("/logout", status_code=204)
+@auth_router.post("/logout", response_model=LogoutSchema)
 async def logout(
+    response: Response,
     application_session: ApplicationSession = Depends(get_current_application_session),
     _csrf: None = Depends(require_csrf),
+    oidc: OidcClient = Depends(get_oidc_client),
     session: AsyncSession = Depends(get_session),
-) -> Response:
+) -> LogoutSchema:
+    """Revoke local state before optionally directing the browser to the IdP."""
     await AuthenticationService(session).revoke_session(application_session)
-    response = Response(status_code=204)
     for key in (SESSION_COOKIE, STATE_COOKIE, CSRF_COOKIE):
         _clear_cookie(response, key)
-    return response
+    # A discovery failure must not prevent local logout or expose provider details.
+    try:
+        metadata = await oidc.discover()
+        endpoint = metadata.get("end_session_endpoint")
+        logout_query = urlencode(
+            {
+                "client_id": oidc.settings.oidc_client_id,
+                "post_logout_redirect_uri": str(oidc.settings.public_url),
+            }
+        )
+        provider_logout_url = (
+            f"{endpoint}{'&' if '?' in endpoint else '?'}{logout_query}"
+            if endpoint
+            else None
+        )
+    except DomainError:
+        provider_logout_url = None
+    return LogoutSchema(provider_logout_url=provider_logout_url)

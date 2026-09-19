@@ -20,3 +20,9 @@ class SessionSchema(BaseModel):
     authenticated: bool
     user: SessionUserSchema | None = None
     roles: EffectiveRolesSchema | None = None
+
+
+class LogoutSchema(BaseModel):
+    """The optional, server-selected identity-provider logout destination."""
+
+    provider_logout_url: str | None = None

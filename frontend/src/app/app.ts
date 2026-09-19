@@ -82,6 +82,8 @@ export class App {
 
   logout(event: Event): void {
     event.preventDefault();
-    this.auth.logout().subscribe(() => void this.router.navigateByUrl('/'));
+    this.auth.logout().subscribe((result) => {
+      if (!result.provider_logout_url) void this.router.navigateByUrl('/');
+    });
   }
 }

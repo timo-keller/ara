@@ -93,6 +93,9 @@ def main() -> None:
             and existing.get("serviceAccountsEnabled") is True
             and existing.get("redirectUris") == ["https://localhost/auth/callback"]
             and existing.get("webOrigins") == ["https://localhost"]
+            and isinstance(existing.get("attributes"), dict)
+            and existing["attributes"].get("post.logout.redirect.uris")
+            == "https://localhost/"
             and {"profile", "email", "roles"}.issubset(
                 existing.get("defaultClientScopes", [])
             )
@@ -137,6 +140,7 @@ def main() -> None:
         "serviceAccountsEnabled": True,
         "redirectUris": ["https://localhost/auth/callback"],
         "webOrigins": ["https://localhost"],
+        "attributes": {"post.logout.redirect.uris": "https://localhost/"},
         "defaultClientScopes": ["profile", "email", "roles"],
         "protocolMappers": [MAPPER],
     }

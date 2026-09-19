@@ -26,6 +26,17 @@ class LoginForm(HTMLParser):
                 self.values[name] = value
 
 
+class LogoutForm(LoginForm):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "form" and not self.action:
+            self.action = attributes.get("action", "")
+        if tag == "input" and attributes.get("type") == "hidden":
+            name, value = attributes.get("name"), attributes.get("value")
+            if name and value is not None:
+                self.values[name] = value
+
+
 class LocalhostCookiePolicy(http.cookiejar.DefaultCookiePolicy):
     """Only relax Secure's localhost transport rule; keep normal path/domain checks."""
 
@@ -64,7 +75,16 @@ def api_request(
 
 
 def main() -> None:
-    username, password, email, expected_role = sys.argv[1:]
+    (
+        username,
+        password,
+        email,
+        expected_role,
+        next_username,
+        next_password,
+        next_email,
+        next_expected_role,
+    ) = sys.argv[1:]
     cookies = http.cookiejar.CookieJar(policy=LocalhostCookiePolicy())
     opener = build_opener(
         HTTPCookieProcessor(cookies),
@@ -164,7 +184,24 @@ def main() -> None:
         ),
         timeout=20,
     )
-    require(logout.status == 204, "logout did not return 204")
+    require(logout.status == 200, "logout did not return 200")
+    logout_result = json.loads(logout.read())
+    logout_url = logout_result.get("provider_logout_url")
+    require(isinstance(logout_url, str), "provider logout URL was not returned")
+    # Follow the server-selected URL with the same browser cookie jar.  This
+    # proves Keycloak's SSO session ended without clearing cookies ourselves.
+    provider_logout = opener.open(logout_url, timeout=20)
+    confirmation = LogoutForm()
+    confirmation.feed(provider_logout.read().decode())
+    if confirmation.action:
+        opener.open(
+            Request(  # noqa: S310 - Keycloak supplies this confirmation action
+                urljoin(provider_logout.geturl(), confirmation.action),
+                data=urlencode(confirmation.values).encode(),
+                method="POST",
+            ),
+            timeout=20,
+        ).read()
     require(
         json.loads(opener.open("https://localhost/auth/session", timeout=20).read())[
             "authenticated"
@@ -172,6 +209,34 @@ def main() -> None:
         is False,
         "session remained authenticated after logout",
     )
+    page = opener.open("https://localhost/auth/login", timeout=20)
+    form = LoginForm()
+    form.feed(page.read().decode())
+    require(bool(form.action), "Keycloak login form was not returned after logout")
+    form.values.update({"username": next_username, "password": next_password})
+    response = opener.open(
+        Request(  # noqa: S310 - Keycloak supplies this form action on localhost
+            urljoin(page.geturl(), form.action),
+            data=urlencode(form.values).encode(),
+            method="POST",
+        ),
+        timeout=20,
+    )
+    response.read()
+    second_session = json.loads(
+        opener.open("https://localhost/auth/session", timeout=20).read()
+    )
+    require(second_session["authenticated"] is True, "second session was not authenticated")
+    require(second_session["user"]["email"] == next_email, "second session email did not match")
+    require(
+        second_session["roles"]["is_owner"] is (next_expected_role == "owner"),
+        "second session Owner role did not match",
+    )
+    second_roles = second_session["roles"]["group_roles"].values()
+    if next_expected_role == "group_admin":
+        require("group_admin" in second_roles, "second group-admin role was not resolved")
+    elif next_expected_role == "user":
+        require("user" in second_roles, "second user role was not resolved")
 
 
 if __name__ == "__main__":

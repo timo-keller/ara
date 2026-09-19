@@ -40,3 +40,24 @@ def test_backchannel_rewrites_only_public_issuer_relative_endpoints() -> None:
 def test_backchannel_rejects_untrusted_metadata_endpoints(endpoint: str) -> None:
     with pytest.raises(DomainError, match="identity provider is unavailable"):
         OidcClient(settings())._backchannel_endpoint(endpoint)  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://169.254.169.254/latest/meta-data",
+        "http://localhost:8080/admin/realms/ara-dev/logout",
+        "http://host.docker.internal:8080/realms/ara-dev/protocol/openid-connect/logout",
+        "http://localhost:8080/realms/ara-dev/protocol/openid-connect/logout#fragment",
+    ],
+)
+def test_public_browser_endpoint_rejects_non_public_or_non_issuer_relative_urls(
+    endpoint: str,
+) -> None:
+    with pytest.raises(DomainError, match="identity provider is unavailable"):
+        OidcClient(settings())._public_browser_endpoint(endpoint)  # noqa: SLF001
+
+
+def test_public_browser_endpoint_is_not_rewritten_to_the_backchannel() -> None:
+    endpoint = "http://localhost:8080/realms/ara-dev/protocol/openid-connect/logout"
+    assert OidcClient(settings())._public_browser_endpoint(endpoint) == endpoint  # noqa: SLF001
