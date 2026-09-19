@@ -1,0 +1,105 @@
+<section aria-labelledby="audit-heading">
+  <h1 id="audit-heading">Audit history</h1>
+  <p>Changes are shown newest first. State snapshots exclude protected operational data.</p>
+  <form
+    class="filters"
+    aria-label="Filter audit history"
+    (submit)="$event.preventDefault(); load()"
+  >
+    <syn-select
+      label="Group"
+      [value]="filters().groupId"
+      (valueChange)="changeFilter('groupId', $event)"
+      ><syn-option value="">All permitted groups</syn-option>
+      @for (group of selectableGroups(); track group.id) {
+        <syn-option [value]="group.id">{{ group.name }}</syn-option>
+      }
+    </syn-select>
+    <syn-input
+      label="Actor ID"
+      [value]="filters().actorId"
+      (valueChange)="changeFilter('actorId', $event)"
+    ></syn-input>
+    <syn-input
+      label="Action"
+      [value]="filters().action"
+      (valueChange)="changeFilter('action', $event)"
+    ></syn-input>
+    <syn-input
+      label="Target type"
+      [value]="filters().targetType"
+      (valueChange)="changeFilter('targetType', $event)"
+    ></syn-input>
+    <syn-input
+      label="Target ID"
+      [value]="filters().targetId"
+      (valueChange)="changeFilter('targetId', $event)"
+    ></syn-input>
+    <syn-input
+      type="datetime-local"
+      label="From (local time)"
+      [value]="datetimeInputValue(filters().createdAtFrom)"
+      (valueChange)="changeFilter('createdAtFrom', $event)"
+    ></syn-input>
+    <syn-input
+      type="datetime-local"
+      label="To (local time)"
+      [value]="datetimeInputValue(filters().createdAtTo)"
+      (valueChange)="changeFilter('createdAtTo', $event)"
+    ></syn-input>
+  </form>
+  @if (state() === 'loading') {
+    <div class="state" aria-live="polite">
+      <syn-spinner></syn-spinner><span>Loading audit history…</span>
+    </div>
+  }
+  @if (state() === 'error') {
+    <syn-alert open variant="error" aria-live="assertive"
+      >We could not load audit history.
+      <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
+    >
+  }
+  @if (state() === 'ready' && !items().length) {
+    <p class="state" aria-live="polite">No audit events match these filters.</p>
+  }
+  @if (state() === 'ready' && items().length) {
+    <div class="events" aria-live="polite">
+      @for (event of items(); track event.id) {
+        <syn-card
+          ><h2 slot="header">{{ event.action }} · {{ event.target_type }}</h2>
+          <dl>
+            <dt>Time</dt>
+            <dd>{{ event.created_at | date: 'medium' : 'UTC' }} UTC</dd>
+            <dt>Group</dt>
+            <dd>{{ groupName(event.group_id) }}</dd>
+            <dt>Actor</dt>
+            <dd>{{ event.actor_id || 'System' }}</dd>
+            <dt>Target</dt>
+            <dd>{{ event.target_id }}</dd>
+          </dl>
+          <syn-details summary="View change details" contained
+            ><div class="states">
+              <section>
+                <h3>Before</h3>
+                <pre>{{ stateJson(event.before_state) }}</pre>
+              </section>
+              <section>
+                <h3>After</h3>
+                <pre>{{ stateJson(event.after_state) }}</pre>
+              </section>
+            </div></syn-details
+          ></syn-card
+        >
+      }
+    </div>
+    <syn-pagination
+      aria-label="Audit history pages"
+      [currentPage]="page()"
+      [pageSize]="filters().limit"
+      [pageSizeOptions]="[10, 25, 50, 100]"
+      [totalItems]="total()"
+      (synPaginationPageChangedEvent)="changePage($event)"
+      (synPaginationPageSizeChangedEvent)="changePageSize($event)"
+    ></syn-pagination>
+  }
+</section>

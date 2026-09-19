@@ -49,6 +49,14 @@
             <syn-icon aria-hidden="true" library="ara" name="inventory" slot="prefix"></syn-icon>
             Manage assets
           </syn-nav-item>
+          <syn-nav-item
+            [attr.current]="isCurrent('/audit') ? '' : null"
+            href="/audit"
+            (click)="navigate('/audit', $event)"
+          >
+            <syn-icon aria-hidden="true" library="ara" name="settings" slot="prefix"></syn-icon>
+            Audit history
+          </syn-nav-item>
         }
         @if (auth.roles()?.is_owner) {
           <syn-nav-item

@@ -57,6 +57,7 @@ describe('App', () => {
     expect(connectSideNavigation).toHaveBeenCalledWith(rail);
     expect(fixture.nativeElement.textContent).toContain('Effective roles: Owner');
     expect(fixture.nativeElement.textContent).toContain('Administration');
+    expect(fixture.nativeElement.textContent).toContain('Audit history');
     http.verify();
   });
 });

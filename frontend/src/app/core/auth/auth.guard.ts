@@ -46,3 +46,6 @@ export const assetAdministrationGuard: CanActivateFn = () => {
       ),
     );
 };
+
+/** Audit queries are restricted to Owners and administrators of at least one group. */
+export const auditGuard: CanActivateFn = (route, state) => assetAdministrationGuard(route, state);

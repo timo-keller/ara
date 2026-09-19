@@ -1,0 +1,37 @@
+.filters,
+.states {
+  display: grid;
+  gap: var(--syn-spacing-medium);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin-bottom: var(--syn-spacing-large);
+}
+.events {
+  display: grid;
+  gap: var(--syn-spacing-large);
+  margin-bottom: var(--syn-spacing-large);
+}
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--syn-spacing-x-small) var(--syn-spacing-medium);
+}
+dt {
+  font-weight: 700;
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+pre {
+  max-height: 24rem;
+  overflow: auto;
+  padding: var(--syn-spacing-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--syn-color-neutral-100);
+}
+.state {
+  align-items: center;
+  display: flex;
+  gap: var(--syn-spacing-small);
+}

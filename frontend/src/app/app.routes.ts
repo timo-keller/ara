@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import {
   assetAdministrationGuard,
+  auditGuard,
   authenticatedGuard,
   groupAccessGuard,
   ownerGuard,
@@ -50,5 +51,11 @@ export const routes: Routes = [
       import('./features/administration/administration.page').then(
         (module) => module.AdministrationPage,
       ),
+  },
+  {
+    path: 'audit',
+    canActivate: [auditGuard],
+    data: { title: 'Audit history' },
+    loadComponent: () => import('./features/audit/audit.page').then((module) => module.AuditPage),
   },
 ];

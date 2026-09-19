@@ -63,7 +63,7 @@ export class App {
   }
 
   isCurrent(path: string): boolean {
-    return this.currentUrl() === path;
+    return this.currentUrl().split('?')[0] === path;
   }
 
   roleLabels(): string[] {

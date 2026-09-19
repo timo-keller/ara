@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { routes } from '../../app.routes';
 import { AuthService } from './auth.service';
-import { assetAdministrationGuard, authenticatedGuard, ownerGuard } from './auth.guard';
+import { assetAdministrationGuard, auditGuard, authenticatedGuard, ownerGuard } from './auth.guard';
 
 describe('authenticatedGuard', () => {
   it('permits an already authenticated session', async () => {
@@ -64,5 +64,20 @@ describe('authenticatedGuard', () => {
       ),
     );
     expect(blocked).not.toBe(true);
+  });
+
+  it('permits Owners and Group Admins, but not regular Users, to audit history', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter(routes)] });
+    const auth = TestBed.inject(AuthService);
+    (auth as unknown as { session: { set(value: unknown): void } }).session.set({
+      authenticated: true,
+      user: { id: 'user', display_name: null, email: null },
+      roles: { is_owner: false, group_roles: { group: 'group_admin' } },
+    });
+    auth.state.set('authenticated');
+    const allowed = await TestBed.runInInjectionContext(() =>
+      firstValueFrom(auditGuard({} as never, {} as never) as ReturnType<typeof auth.ensureSession>),
+    );
+    expect(allowed).toBe(true);
   });
 });
