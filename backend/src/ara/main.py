@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
     import ara.api.routers.auth  # noqa: F401
     import ara.api.routers.groups  # noqa: F401
     import ara.api.routers.health  # noqa: F401
+    import ara.api.routers.reservations  # noqa: F401
     import ara.api.routers.role_mappings  # noqa: F401
 
     app.include_router(api_router)

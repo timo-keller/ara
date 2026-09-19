@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import Reservation, ReservationStatus
@@ -18,6 +18,39 @@ class ReservationDAO:
     def add(self, reservation: Reservation) -> None:
         """Stage a reservation for the caller's service transaction."""
         self.session.add(reservation)
+
+    async def list_for_user(
+        self, *, user_id: uuid.UUID, offset: int, limit: int
+    ) -> tuple[list[Reservation], int]:
+        """Return one user's reservations in stable newest-first order."""
+        statement = select(Reservation).where(Reservation.user_id == user_id)
+        total = await self.session.scalar(
+            select(func.count()).select_from(statement.subquery())
+        )
+        result = await self.session.scalars(
+            statement.order_by(Reservation.starts_at.desc(), Reservation.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result), total or 0
+
+    async def list_active_for_asset(
+        self, *, asset_id: uuid.UUID, offset: int, limit: int
+    ) -> tuple[list[Reservation], int]:
+        """Return an asset's active schedule in stable chronological order."""
+        statement = select(Reservation).where(
+            Reservation.asset_id == asset_id,
+            Reservation.status == ReservationStatus.ACTIVE,
+        )
+        total = await self.session.scalar(
+            select(func.count()).select_from(statement.subquery())
+        )
+        result = await self.session.scalars(
+            statement.order_by(Reservation.starts_at, Reservation.id)
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result), total or 0
 
     async def get_bounded_conflict(
         self,

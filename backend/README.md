@@ -92,3 +92,14 @@ is positive infinity. Conflict checking and insertion run in one SQLite
 `BEGIN IMMEDIATE` write transaction. This relies on the documented single
 backend-process deployment model; SQLite does not provide a range exclusion
 constraint for multi-process deployments.
+
+## Reservations API
+
+Authenticated group members create their own reservations with `POST
+/api/reservations`; the CSRF token is required. `GET /api/reservations/mine`
+lists the current user's reservations newest-first, and `GET
+/api/assets/{asset_id}/reservations` lists an accessible asset's active schedule
+chronologically. Both lists use `offset` and `limit` pagination and a stable
+identifier tie-breaker. Creation rejects archived groups or assets and requires
+UTC timestamps (`Z` or `+00:00`). Self-service starts must be now or future;
+a one-minute grace period accommodates an immediate browser timestamp in transit.
