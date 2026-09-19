@@ -1,0 +1,14 @@
+node_modules
+dist
+.angular
+
+# Development-only tooling and configuration are not build inputs.
+synergy-mcp.json
+
+# Local secrets and certificates must be mounted only at runtime.
+.env
+.env.*
+certificates
+*.pem
+*.key
+*.crt

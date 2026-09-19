@@ -11,7 +11,8 @@
     "test": "ng test --watch=false",
     "lint": "ng lint",
     "format:check": "prettier --check .",
-    "verify:production-output": "node scripts/verify-production-output.mjs"
+    "verify:production-output": "node scripts/verify-production-output.mjs",
+    "smoke:web-image": "bash scripts/smoke-web-image.sh"
   },
   "private": true,
   "packageManager": "npm@11.13.0",
