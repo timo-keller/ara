@@ -29,6 +29,16 @@ tables at startup. Run pending migrations before starting the API:
 uv run alembic upgrade head
 ```
 
+## Scheduled work
+
+APScheduler runs in the FastAPI lifespan and uses one asyncio scheduler per
+backend process. Jobs receive a fresh async database session through
+`run_scheduled_job`, which emits structured completion or failure logs. The
+deployment must continue to use exactly one backend process and one Uvicorn
+worker: the in-process scheduler is not safe to run across multiple workers.
+Job executions coalesce missed runs, allow one concurrent instance, and have a
+60-second misfire grace period.
+
 ## Health and API conventions
 
 The API and authentication route foundations are mounted at `/api` and `/auth`.

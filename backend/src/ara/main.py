@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from ara.api.routers import api_router, auth_router
 from ara.core.errors import DomainError
 from ara.core.request_context import add_request_context, get_correlation_id
+from ara.infrastructure.scheduler import scheduler_lifespan
 
 
 def _error_response(
@@ -29,7 +30,7 @@ def _error_response(
 
 def create_app() -> FastAPI:
     """Create the ARA API application."""
-    app = FastAPI(title="ARA")
+    app = FastAPI(title="ARA", lifespan=scheduler_lifespan)
     app.middleware("http")(add_request_context)
 
     @app.exception_handler(DomainError)
