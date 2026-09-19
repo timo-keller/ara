@@ -11,7 +11,13 @@ from ara.core.errors import DomainError
 from ara.daos.groups import GroupDAO
 from ara.daos.role_mappings import RoleMappingDAO
 from ara.domain.models import GroupRole, RoleMapping, utc_now
-from ara.services.audit import AuditContext, AuditService, role_mapping_snapshot
+from ara.services.audit import (
+    AuditAction,
+    AuditContext,
+    AuditService,
+    AuditTargetType,
+    role_mapping_snapshot,
+)
 from ara.services.authorization import (
     AuthorizationService,
     EffectiveRoles,
@@ -52,7 +58,7 @@ class RoleMappingService:
             priority=priority,
         )
         self.mappings.add(mapping)
-        await self._commit(mapping, "role_mapping.create", None)
+        await self._commit(mapping, AuditAction.ROLE_MAPPING_CREATE, None)
         return mapping
 
     async def list_mappings(
@@ -96,7 +102,7 @@ class RoleMappingService:
             mapping.enabled = enabled
         if priority is not None:
             mapping.priority = priority
-        await self._commit(mapping, "role_mapping.update", before)
+        await self._commit(mapping, AuditAction.ROLE_MAPPING_UPDATE, before)
         return mapping
 
     async def disable(
@@ -107,7 +113,7 @@ class RoleMappingService:
         mapping = await self._get_required(mapping_id)
         before = role_mapping_snapshot(mapping)
         mapping.enabled = False
-        await self._commit(mapping, "role_mapping.disable", before)
+        await self._commit(mapping, AuditAction.ROLE_MAPPING_DISABLE, before)
         return mapping
 
     async def archive(
@@ -119,7 +125,7 @@ class RoleMappingService:
         if mapping.archived_at is None:
             before = role_mapping_snapshot(mapping)
             mapping.archived_at = utc_now()
-            await self._commit(mapping, "role_mapping.archive", before)
+            await self._commit(mapping, AuditAction.ROLE_MAPPING_ARCHIVE, before)
         return mapping
 
     async def test_expression(
@@ -162,14 +168,17 @@ class RoleMappingService:
         return mapping
 
     async def _commit(
-        self, mapping: RoleMapping, action: str, before: dict[str, object] | None
+        self,
+        mapping: RoleMapping,
+        action: AuditAction,
+        before: dict[str, object] | None,
     ) -> None:
         try:
             await self.session.flush()
             self.audit.record(
                 action=action,
                 group_id=mapping.group_id,
-                target_type="role_mapping",
+                target_type=AuditTargetType.ROLE_MAPPING,
                 target_id=mapping.id,
                 before=before,
                 after=role_mapping_snapshot(mapping),

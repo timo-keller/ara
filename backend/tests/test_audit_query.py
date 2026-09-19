@@ -13,7 +13,7 @@ from ara.core.errors import DomainError
 from ara.domain.models import AuditEvent, Group, GroupRole, User
 from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
-from ara.services.audit import AuditService
+from ara.services.audit import AUDIT_ACTIONS, AUDIT_TARGET_TYPES, AuditService
 from ara.services.authorization import EffectiveRoles
 
 ApiClient = tuple[
@@ -157,6 +157,26 @@ def test_audit_query_api_filters_pagination_and_ordering(
     for params, total in filters:
         assert client.get("/api/audit-events", params=params).json()["total"] == total
 
+    repeated = client.get(
+        "/api/audit-events",
+        params=[
+            ("action", "asset.create"),
+            ("action", "reservation.create"),
+            ("target_type", "asset"),
+        ],
+    )
+    assert repeated.status_code == 200
+    assert repeated.json()["total"] == 2
+    assert {item["action"] for item in repeated.json()["items"]} == {"asset.create"}
+
+    assert (
+        client.get("/api/audit-events", params={"action": "unknown"}).status_code == 422
+    )
+    assert (
+        client.get("/api/audit-events", params={"target_type": "unknown"}).status_code
+        == 422
+    )
+
     assert (
         client.get(
             "/api/audit-events", params={"created_at_from": "2030-01-01T01:00:00+01:00"}
@@ -173,6 +193,29 @@ def test_audit_query_api_filters_pagination_and_ordering(
         ).status_code
         == 422
     )
+
+
+def test_audit_filter_vocabulary_matches_recorded_domain_actions() -> None:
+    assert AUDIT_ACTIONS == (
+        "asset.create",
+        "asset.update",
+        "asset.archive",
+        "asset.reactivate",
+        "group.create",
+        "group.update",
+        "group.archive",
+        "group.reactivate",
+        "reservation.create",
+        "reservation.extend",
+        "reservation.return",
+        "reservation.cancel",
+        "reservation.end",
+        "role_mapping.create",
+        "role_mapping.update",
+        "role_mapping.disable",
+        "role_mapping.archive",
+    )
+    assert AUDIT_TARGET_TYPES == ("asset", "group", "reservation", "role_mapping")
 
 
 def test_audit_query_api_role_scope_and_cross_group_filter_isolation(

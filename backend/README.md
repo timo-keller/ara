@@ -173,6 +173,14 @@ require CSRF and reject terminal/repeated operations with `409`.
 `GET /api/audit-events` returns reverse-chronological audit history with a
 deterministic event-identifier tie-breaker. It accepts `group_id`, `actor_id`,
 `action`, `target_type`, `target_id`, `created_at_from`, `created_at_to`,
-`offset`, and `limit` filters; time values must be UTC. Owners can query all
-events, while Group Admins see only events associated with their administered
-groups. Users are denied access.
+`offset`, and `limit` filters; time values must be UTC. `action` and
+`target_type` may each be repeated to match any supplied value; these two
+filters, and all other filters, are intersected. Supported actions are
+`asset.create`, `asset.update`, `asset.archive`, `asset.reactivate`,
+`group.create`, `group.update`, `group.archive`, `group.reactivate`,
+`reservation.create`, `reservation.extend`, `reservation.return`,
+`reservation.cancel`, `reservation.end`, `role_mapping.create`,
+`role_mapping.update`, `role_mapping.disable`, and `role_mapping.archive`.
+Supported target types are `asset`, `group`, `reservation`, and `role_mapping`.
+Owners can query all events, while Group Admins see only events associated with
+their administered groups. Users are denied access.

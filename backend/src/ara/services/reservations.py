@@ -18,7 +18,13 @@ from ara.domain.models import (
     ReservationStatus,
     utc_now,
 )
-from ara.services.audit import AuditContext, AuditService, reservation_snapshot
+from ara.services.audit import (
+    AuditAction,
+    AuditContext,
+    AuditService,
+    AuditTargetType,
+    reservation_snapshot,
+)
 from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
@@ -66,9 +72,9 @@ class ReservationService:
             self.reservations.add(reservation)
             await self.session.flush()
             self.audit.record(
-                action="reservation.create",
+                action=AuditAction.RESERVATION_CREATE,
                 group_id=asset.group_id,
-                target_type="reservation",
+                target_type=AuditTargetType.RESERVATION,
                 target_id=reservation.id,
                 before=None,
                 after=reservation_snapshot(reservation),
@@ -112,9 +118,9 @@ class ReservationService:
             self.reservations.add(reservation)
             await self.session.flush()
             self.audit.record(
-                action="reservation.create",
+                action=AuditAction.RESERVATION_CREATE,
                 group_id=group.id,
-                target_type="reservation",
+                target_type=AuditTargetType.RESERVATION,
                 target_id=reservation.id,
                 before=None,
                 after=reservation_snapshot(reservation),
@@ -165,9 +171,9 @@ class ReservationService:
             reservation.ends_at = ends_at
             await self.session.flush()
             self.audit.record(
-                action="reservation.extend",
+                action=AuditAction.RESERVATION_EXTEND,
                 group_id=asset.group_id,
-                target_type="reservation",
+                target_type=AuditTargetType.RESERVATION,
                 target_id=reservation.id,
                 before=before,
                 after=reservation_snapshot(reservation),
@@ -199,9 +205,9 @@ class ReservationService:
             self._record_early_end(reservation, now)
             await self.session.flush()
             self.audit.record(
-                action="reservation.return",
+                action=AuditAction.RESERVATION_RETURN,
                 group_id=asset.group_id,
-                target_type="reservation",
+                target_type=AuditTargetType.RESERVATION,
                 target_id=reservation.id,
                 before=before,
                 after=reservation_snapshot(reservation),
@@ -234,9 +240,9 @@ class ReservationService:
             reservation.cancelled_at = now
             await self.session.flush()
             self.audit.record(
-                action="reservation.cancel",
+                action=AuditAction.RESERVATION_CANCEL,
                 group_id=asset.group_id,
-                target_type="reservation",
+                target_type=AuditTargetType.RESERVATION,
                 target_id=reservation.id,
                 before=before,
                 after=reservation_snapshot(reservation),
@@ -267,9 +273,9 @@ class ReservationService:
             self._record_early_end(reservation, now)
             await self.session.flush()
             self.audit.record(
-                action="reservation.end",
+                action=AuditAction.RESERVATION_END,
                 group_id=asset.group_id,
-                target_type="reservation",
+                target_type=AuditTargetType.RESERVATION,
                 target_id=reservation.id,
                 before=before,
                 after=reservation_snapshot(reservation),

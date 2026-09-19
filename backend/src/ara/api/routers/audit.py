@@ -17,7 +17,7 @@ from ara.api.schemas.audit import (
     AuditQuerySchema,
 )
 from ara.infrastructure.database import get_session
-from ara.services.audit import AuditService
+from ara.services.audit import AuditAction, AuditService, AuditTargetType
 from ara.services.authorization import EffectiveRoles
 
 
@@ -31,8 +31,8 @@ async def list_audit_events(
     session: Annotated[AsyncSession, Depends(get_session)],
     group_id: Annotated[uuid.UUID | None, Query()] = None,
     actor_id: Annotated[uuid.UUID | None, Query()] = None,
-    action: Annotated[str | None, Query()] = None,
-    target_type: Annotated[str | None, Query()] = None,
+    action: Annotated[list[AuditAction] | None, Query()] = None,
+    target_type: Annotated[list[AuditTargetType] | None, Query()] = None,
     target_id: Annotated[str | None, Query()] = None,
     created_at_from: Annotated[datetime | None, Query()] = None,
     created_at_to: Annotated[datetime | None, Query()] = None,

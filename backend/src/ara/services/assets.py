@@ -10,7 +10,13 @@ from ara.core.errors import DomainError
 from ara.daos.assets import AssetDAO
 from ara.daos.groups import GroupDAO
 from ara.domain.models import Asset, Group, GroupRole, utc_now
-from ara.services.audit import AuditContext, AuditService, asset_snapshot
+from ara.services.audit import (
+    AuditAction,
+    AuditContext,
+    AuditService,
+    AuditTargetType,
+    asset_snapshot,
+)
 from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
@@ -33,7 +39,7 @@ class AssetService:
         self._require_active_group(group)
         asset = Asset(group_id=group.id, **values)
         self.assets.add(asset)
-        await self._commit(asset, "asset.create", None)
+        await self._commit(asset, AuditAction.ASSET_CREATE, None)
         return asset
 
     async def list_assets(
@@ -104,7 +110,7 @@ class AssetService:
         before = asset_snapshot(asset)
         for field, value in values.items():
             setattr(asset, field, value)
-        await self._commit(asset, "asset.update", before)
+        await self._commit(asset, AuditAction.ASSET_UPDATE, before)
         return asset
 
     async def archive(self, actor_roles: EffectiveRoles, asset_id: uuid.UUID) -> Asset:
@@ -113,7 +119,7 @@ class AssetService:
         if asset.archived_at is None:
             before = asset_snapshot(asset)
             asset.archived_at = utc_now()
-            await self._commit(asset, "asset.archive", before)
+            await self._commit(asset, AuditAction.ASSET_ARCHIVE, before)
         return asset
 
     async def reactivate(
@@ -125,7 +131,7 @@ class AssetService:
         if asset.archived_at is not None:
             before = asset_snapshot(asset)
             asset.archived_at = None
-            await self._commit(asset, "asset.reactivate", before)
+            await self._commit(asset, AuditAction.ASSET_REACTIVATE, before)
         return asset
 
     async def _get_required(self, asset_id: uuid.UUID) -> Asset:
@@ -142,14 +148,14 @@ class AssetService:
         return group
 
     async def _commit(
-        self, asset: Asset, action: str, before: dict[str, object] | None
+        self, asset: Asset, action: AuditAction, before: dict[str, object] | None
     ) -> None:
         try:
             await self.session.flush()
             self.audit.record(
                 action=action,
                 group_id=asset.group_id,
-                target_type="asset",
+                target_type=AuditTargetType.ASSET,
                 target_id=asset.id,
                 before=before,
                 after=asset_snapshot(asset),

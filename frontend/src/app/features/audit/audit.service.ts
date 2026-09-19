@@ -4,8 +4,8 @@ import { Injectable, inject } from '@angular/core';
 export interface AuditFilters {
   groupId: string;
   actorId: string;
-  action: string;
-  targetType: string;
+  action: string[];
+  targetType: string[];
   targetId: string;
   createdAtFrom: string;
   createdAtTo: string;
@@ -33,21 +33,19 @@ export interface AuditPage {
   limit: number;
 }
 
-const queryNames: Record<keyof Omit<AuditFilters, 'offset' | 'limit'>, string> = {
+const queryNames = {
   groupId: 'group_id',
   actorId: 'actor_id',
-  action: 'action',
-  targetType: 'target_type',
   targetId: 'target_id',
   createdAtFrom: 'created_at_from',
   createdAtTo: 'created_at_to',
-};
+} as const;
 
 export const defaultAuditFilters = (): AuditFilters => ({
   groupId: '',
   actorId: '',
-  action: '',
-  targetType: '',
+  action: [],
+  targetType: [],
   targetId: '',
   createdAtFrom: '',
   createdAtTo: '',
@@ -61,6 +59,8 @@ export function auditQuery(filters: AuditFilters): HttpParams {
     const value = filters[key].trim();
     if (value) params = params.set(name, value);
   }
+  for (const action of filters.action) params = params.append('action', action);
+  for (const targetType of filters.targetType) params = params.append('target_type', targetType);
   return params;
 }
 

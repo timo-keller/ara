@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,40 @@ from ara.domain.models import (
     RoleMapping,
 )
 from ara.services.authorization import AuthorizationService, EffectiveRoles
+
+
+# This is the complete vocabulary emitted by the domain services. Keep it in
+# sync with calls to AuditService.record so query validation and filter choices
+# remain based on recorded events, rather than a page of historical results.
+class AuditAction(StrEnum):
+    ASSET_CREATE = "asset.create"
+    ASSET_UPDATE = "asset.update"
+    ASSET_ARCHIVE = "asset.archive"
+    ASSET_REACTIVATE = "asset.reactivate"
+    GROUP_CREATE = "group.create"
+    GROUP_UPDATE = "group.update"
+    GROUP_ARCHIVE = "group.archive"
+    GROUP_REACTIVATE = "group.reactivate"
+    RESERVATION_CREATE = "reservation.create"
+    RESERVATION_EXTEND = "reservation.extend"
+    RESERVATION_RETURN = "reservation.return"
+    RESERVATION_CANCEL = "reservation.cancel"
+    RESERVATION_END = "reservation.end"
+    ROLE_MAPPING_CREATE = "role_mapping.create"
+    ROLE_MAPPING_UPDATE = "role_mapping.update"
+    ROLE_MAPPING_DISABLE = "role_mapping.disable"
+    ROLE_MAPPING_ARCHIVE = "role_mapping.archive"
+
+
+class AuditTargetType(StrEnum):
+    ASSET = "asset"
+    GROUP = "group"
+    RESERVATION = "reservation"
+    ROLE_MAPPING = "role_mapping"
+
+
+AUDIT_ACTIONS = tuple(action.value for action in AuditAction)
+AUDIT_TARGET_TYPES = tuple(target_type.value for target_type in AuditTargetType)
 
 
 @dataclass(frozen=True)
@@ -105,9 +140,9 @@ class AuditService:
     def record(
         self,
         *,
-        action: str,
+        action: AuditAction,
         group_id: uuid.UUID | None,
-        target_type: str,
+        target_type: AuditTargetType,
         target_id: uuid.UUID,
         before: dict[str, Any] | None,
         after: dict[str, Any] | None,
@@ -131,8 +166,8 @@ class AuditService:
         *,
         group_id: uuid.UUID | None,
         actor_id: uuid.UUID | None,
-        action: str | None,
-        target_type: str | None,
+        action: list[AuditAction] | None,
+        target_type: list[AuditTargetType] | None,
         target_id: str | None,
         created_at_from: datetime | None,
         created_at_to: datetime | None,

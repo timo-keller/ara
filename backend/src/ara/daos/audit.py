@@ -1,6 +1,7 @@
 """Persistence operations for append-only audit events."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import delete, func, select
@@ -46,8 +47,8 @@ class AuditDAO:
         group_ids: set[uuid.UUID] | None,
         group_id: uuid.UUID | None,
         actor_id: uuid.UUID | None,
-        action: str | None,
-        target_type: str | None,
+        action: Sequence[str] | None,
+        target_type: Sequence[str] | None,
         target_id: str | None,
         created_at_from: datetime | None,
         created_at_to: datetime | None,
@@ -62,10 +63,10 @@ class AuditDAO:
             filters.append(AuditEvent.group_id == group_id)
         if actor_id is not None:
             filters.append(AuditEvent.actor_id == actor_id)
-        if action is not None:
-            filters.append(AuditEvent.action == action)
-        if target_type is not None:
-            filters.append(AuditEvent.target_type == target_type)
+        if action:
+            filters.append(AuditEvent.action.in_(action))
+        if target_type:
+            filters.append(AuditEvent.target_type.in_(target_type))
         if target_id is not None:
             filters.append(AuditEvent.target_id == target_id)
         if created_at_from is not None:

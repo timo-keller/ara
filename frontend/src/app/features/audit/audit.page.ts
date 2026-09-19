@@ -4,6 +4,7 @@ import { ActivatedRoute, Params, Router } from '@angular/router';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
 import { SynCardComponent } from '@synergy-design-system/angular/components/card';
+import { SynComboboxComponent } from '@synergy-design-system/angular/components/combobox';
 import { SynDetailsComponent } from '@synergy-design-system/angular/components/details';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
 import { SynOptionComponent } from '@synergy-design-system/angular/components/option';
@@ -16,6 +17,35 @@ import { AssetAdministrationService } from '../assets/asset-administration.servi
 import { AuditEvent, AuditFilters, AuditService, defaultAuditFilters } from './audit.service';
 
 const secretKey = /(?:password|secret|token|credential|access[_-]?instructions)/i;
+
+/** These fixed choices mirror the backend's recorded audit-event vocabulary. */
+export const auditActions = [
+  'asset.create',
+  'asset.update',
+  'asset.archive',
+  'asset.reactivate',
+  'group.create',
+  'group.update',
+  'group.archive',
+  'group.reactivate',
+  'reservation.create',
+  'reservation.extend',
+  'reservation.return',
+  'reservation.cancel',
+  'reservation.end',
+  'role_mapping.create',
+  'role_mapping.update',
+  'role_mapping.disable',
+  'role_mapping.archive',
+] as const;
+export const auditTargetTypes = ['asset', 'group', 'reservation', 'role_mapping'] as const;
+
+function queryValues(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values.filter(
+    (candidate): candidate is string => typeof candidate === 'string' && !!candidate,
+  );
+}
 
 /** Convert a canonical UTC query value to the browser-local datetime-local representation. */
 export function utcIsoToLocalDatetimeInput(value: string): string {
@@ -42,8 +72,8 @@ export function auditFiltersFromQuery(params: Params): AuditFilters {
   return {
     groupId: String(params['group_id'] ?? ''),
     actorId: String(params['actor_id'] ?? ''),
-    action: String(params['action'] ?? ''),
-    targetType: String(params['target_type'] ?? ''),
+    action: queryValues(params['action']),
+    targetType: queryValues(params['target_type']),
     targetId: String(params['target_id'] ?? ''),
     createdAtFrom: String(params['created_at_from'] ?? ''),
     createdAtTo: String(params['created_at_to'] ?? ''),
@@ -57,16 +87,17 @@ export function auditQueryParams(filters: AuditFilters): Params {
     offset: filters.offset || null,
     limit: filters.limit === 25 ? null : filters.limit,
   };
-  const names: [keyof Omit<AuditFilters, 'offset' | 'limit'>, string][] = [
-    ['groupId', 'group_id'],
-    ['actorId', 'actor_id'],
-    ['action', 'action'],
-    ['targetType', 'target_type'],
-    ['targetId', 'target_id'],
-    ['createdAtFrom', 'created_at_from'],
-    ['createdAtTo', 'created_at_to'],
-  ];
+  const names: [keyof Omit<AuditFilters, 'action' | 'targetType' | 'offset' | 'limit'>, string][] =
+    [
+      ['groupId', 'group_id'],
+      ['actorId', 'actor_id'],
+      ['targetId', 'target_id'],
+      ['createdAtFrom', 'created_at_from'],
+      ['createdAtTo', 'created_at_to'],
+    ];
   for (const [key, name] of names) params[name] = filters[key].trim() || null;
+  params['action'] = filters.action.length ? filters.action : null;
+  params['target_type'] = filters.targetType.length ? filters.targetType : null;
   return params;
 }
 
@@ -91,6 +122,7 @@ export function safeAuditJson(value: Record<string, unknown> | null): string {
     SynAlertComponent,
     SynButtonComponent,
     SynCardComponent,
+    SynComboboxComponent,
     SynDetailsComponent,
     SynInputComponent,
     SynOptionComponent,
@@ -113,6 +145,8 @@ export class AuditPage {
   readonly total = signal(0);
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   readonly filters = signal(defaultAuditFilters());
+  readonly auditActions = auditActions;
+  readonly auditTargetTypes = auditTargetTypes;
   readonly selectableGroups = computed(() =>
     this.auth.roles()?.is_owner
       ? this.groups()
@@ -147,12 +181,14 @@ export class AuditPage {
     name: keyof Omit<AuditFilters, 'offset' | 'limit'>,
     value: string | number | (string | number)[],
   ): void {
-    const rawValue = String(value);
+    const rawValue = Array.isArray(value) ? value.map(String) : String(value);
     const normalized =
       name === 'createdAtFrom' || name === 'createdAtTo'
-        ? localDatetimeInputToUtcIso(rawValue)
-        : rawValue;
-    const filters = { ...this.filters(), [name]: normalized, offset: 0 };
+        ? localDatetimeInputToUtcIso(rawValue as string)
+        : name === 'action' || name === 'targetType'
+          ? rawValue
+          : rawValue;
+    const filters = { ...this.filters(), [name]: normalized, offset: 0 } as AuditFilters;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: auditQueryParams(filters),

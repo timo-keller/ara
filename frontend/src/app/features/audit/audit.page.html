@@ -20,16 +20,30 @@
       [value]="filters().actorId"
       (valueChange)="changeFilter('actorId', $event)"
     ></syn-input>
-    <syn-input
+    <syn-combobox
       label="Action"
       [value]="filters().action"
       (valueChange)="changeFilter('action', $event)"
-    ></syn-input>
-    <syn-input
+      multiple
+      clearable
+      restricted
+    >
+      @for (action of auditActions; track action) {
+        <syn-option [value]="action">{{ action }}</syn-option>
+      }
+    </syn-combobox>
+    <syn-combobox
       label="Target type"
       [value]="filters().targetType"
       (valueChange)="changeFilter('targetType', $event)"
-    ></syn-input>
+      multiple
+      clearable
+      restricted
+    >
+      @for (targetType of auditTargetTypes; track targetType) {
+        <syn-option [value]="targetType">{{ targetType }}</syn-option>
+      }
+    </syn-combobox>
     <syn-input
       label="Target ID"
       [value]="filters().targetId"

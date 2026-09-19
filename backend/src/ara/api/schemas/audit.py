@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from ara.services.audit import AuditAction, AuditTargetType
+
 
 class AuditQuerySchema(BaseModel):
     """Optional filters and pagination for reverse-chronological audit history."""
@@ -14,8 +16,8 @@ class AuditQuerySchema(BaseModel):
 
     group_id: uuid.UUID | None = None
     actor_id: uuid.UUID | None = None
-    action: str | None = None
-    target_type: str | None = None
+    action: list[AuditAction] | None = None
+    target_type: list[AuditTargetType] | None = None
     target_id: str | None = None
     created_at_from: datetime | None = None
     created_at_to: datetime | None = None

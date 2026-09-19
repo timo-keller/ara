@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ara.core.errors import DomainError
 from ara.daos.groups import GroupDAO
 from ara.domain.models import Group, utc_now
-from ara.services.audit import AuditContext, AuditService, group_snapshot
+from ara.services.audit import (
+    AuditAction,
+    AuditContext,
+    AuditService,
+    AuditTargetType,
+    group_snapshot,
+)
 from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 
@@ -32,7 +38,7 @@ class GroupService:
         AuthorizationService.require_owner(actor_roles)
         group = Group(name=name, description=description)
         self.groups.add(group)
-        await self._commit(group, "group.create", None)
+        await self._commit(group, AuditAction.GROUP_CREATE, None)
         return group
 
     async def list_groups(
@@ -89,7 +95,7 @@ class GroupService:
             group.name = name
         if update_description:
             group.description = description
-        await self._commit(group, "group.update", before)
+        await self._commit(group, AuditAction.GROUP_UPDATE, before)
         return group
 
     async def archive(self, actor_roles: EffectiveRoles, group_id: uuid.UUID) -> Group:
@@ -115,7 +121,7 @@ class GroupService:
                 )
             before = group_snapshot(group)
             group.archived_at = utc_now()
-            await self._commit(group, "group.archive", before)
+            await self._commit(group, AuditAction.GROUP_ARCHIVE, before)
         return group
 
     async def reactivate(
@@ -126,7 +132,7 @@ class GroupService:
         if group.archived_at is not None:
             before = group_snapshot(group)
             group.archived_at = None
-            await self._commit(group, "group.reactivate", before)
+            await self._commit(group, AuditAction.GROUP_REACTIVATE, before)
         return group
 
     async def _get_required(self, group_id: uuid.UUID) -> Group:
@@ -137,14 +143,14 @@ class GroupService:
         return group
 
     async def _commit(
-        self, group: Group, action: str, before: dict[str, object] | None
+        self, group: Group, action: AuditAction, before: dict[str, object] | None
     ) -> None:
         try:
             await self.session.flush()
             self.audit.record(
                 action=action,
                 group_id=group.id,
-                target_type="group",
+                target_type=AuditTargetType.GROUP,
                 target_id=group.id,
                 before=before,
                 after=group_snapshot(group),
