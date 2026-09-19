@@ -6,6 +6,19 @@ dedicated internal application network. Caddy additionally has an ingress-only
 network for Docker's published-port routing, while the API has an unpublished
 egress network so it can contact the configured OIDC issuer.
 
+## Local development
+
+`../run-dev.sh` is the local-only entrypoint: it generates ignored `.dev/`
+certificates, secrets, realm import, and data on its first `up`, then starts the
+application and a separate pinned Keycloak Compose project.  Keycloak is bound
+to loopback only and is intentionally not connected to an ARA network.  The
+browser issuer remains `http://localhost:8080/realms/ara-dev`; the backend uses
+the restricted `keycloak` service on a dedicated internal backchannel network
+for discovery, token and JWKS requests only.  Use `./run-dev.sh test` for the bounded local verification and
+`./run-dev.sh down` to stop while retaining state.  `reset` requires
+`ARA_DEV_RESET_CONFIRM=YES` and removes only generated state and the local
+Keycloak volume.
+
 ## Host setup
 
 From the repository root, create local directories and three one-line secret
@@ -92,8 +105,12 @@ read-only `/certificates` mount.
 
 ## Reproducible checks
 
-`deployment/scripts/verify-compose.sh` renders and statically checks the
-configuration using temporary placeholder files. `deployment/scripts/smoke-compose.sh`
+`deployment/scripts/verify-compose.sh` renders and checks the production Compose
+model, including secret redaction, mount modes, health dependency, and internal
+networking. `deployment/scripts/verify-compose.sh .dev/dev.env` additionally
+checks the local Keycloak topology and the live OIDC backchannel network; this
+form is run by `run-dev.sh test`.
+`deployment/scripts/smoke-compose.sh`
 builds and starts the complete deployment with temporary certificates and
 placeholder secrets; it tests backend health through TLS/Caddy, confirms the
 backend has no published port, verifies placeholders are absent from the model,

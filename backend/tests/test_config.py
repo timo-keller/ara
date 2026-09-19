@@ -109,3 +109,26 @@ def test_secret_file_must_be_within_secret_directory(tmp_path: Path) -> None:
 def test_required_settings_are_validated() -> None:
     with pytest.raises(ValidationError, match="public_url"):
         Settings.from_environment({})
+
+
+def test_backchannel_must_match_realm_path_and_owner_expression_is_validated() -> None:
+    settings = Settings.from_environment(
+        environment()
+        | {
+            "ARA_OIDC_BACKCHANNEL_URL": "http://host.docker.internal:8080/realms/ara",
+            "ARA_OWNER_CLAIM_EXPRESSION": "contains(realm_access.roles, 'ara-owner')",
+        }
+    )
+    assert (
+        str(settings.oidc_backchannel_url)
+        == "http://host.docker.internal:8080/realms/ara"
+    )
+    assert settings.owner_claim_expression is not None
+
+    with pytest.raises(ValidationError, match="owner_claim_expression is invalid"):
+        Settings.from_environment(environment() | {"ARA_OWNER_CLAIM_EXPRESSION": "("})
+    with pytest.raises(ValidationError, match="issuer realm path"):
+        Settings.from_environment(
+            environment()
+            | {"ARA_OIDC_BACKCHANNEL_URL": "http://host.docker.internal:8080/nope"}
+        )

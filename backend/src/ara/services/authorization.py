@@ -54,9 +54,19 @@ class EffectiveRoles:
 class RoleResolutionService:
     """Resolve OIDC claims into stable ARA roles without exposing the claims."""
 
-    def __init__(self, session: AsyncSession, owner_subjects: str) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        owner_subjects: str,
+        owner_claim_expression: str | None = None,
+    ) -> None:
         self.mappings = RoleMappingDAO(session)
         self.owner_subjects = parse_owner_subjects(owner_subjects)
+        self.owner_claim_expression = (
+            validate_role_expression(owner_claim_expression)
+            if owner_claim_expression is not None
+            else None
+        )
 
     async def resolve(self, user: User, claims: Mapping[str, Any]) -> EffectiveRoles:
         """Evaluate all enabled mappings in priority/identifier order.
@@ -65,6 +75,13 @@ class RoleResolutionService:
         This makes the result independent of incidental database row order.
         """
         is_owner = user.oidc_subject in self.owner_subjects
+        if self.owner_claim_expression is not None:
+            try:
+                is_owner = (
+                    is_owner or self.owner_claim_expression.search(claims) is True
+                )
+            except JMESPathError:
+                pass
         group_roles: dict[uuid.UUID, GroupRole] = {}
         for mapping in await self.mappings.list_enabled():
             expression = validate_role_expression(mapping.expression)

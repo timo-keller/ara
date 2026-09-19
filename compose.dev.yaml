@@ -1,0 +1,19 @@
+# Local-only overlay.  Keycloak deliberately lives in compose.keycloak.dev.yaml,
+# so it never joins application, backend_egress, or web_ingress.
+networks:
+  oidc_backchannel:
+    external: true
+    name: ara-dev-oidc-backchannel
+services:
+  backend:
+    # Docker Compose file secrets retain host ownership.  The local process UID
+    # therefore reads the generated 0600 files without weakening their mode.
+    user: "${ARA_DEV_UID}:${ARA_DEV_GID}"
+    environment:
+      ARA_OIDC_BACKCHANNEL_URL: ${ARA_OIDC_BACKCHANNEL_URL}
+      ARA_OWNER_CLAIM_EXPRESSION: ${ARA_OWNER_CLAIM_EXPRESSION}
+    networks:
+      oidc_backchannel:
+  web:
+    ports: !override
+      - 127.0.0.1:${ARA_HTTPS_PORT}:443

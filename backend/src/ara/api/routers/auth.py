@@ -233,7 +233,9 @@ async def current_session(
         return SessionSchema(authenticated=False)
     user = application_session.user
     roles = await RoleResolutionService(
-        session, get_settings().owner_subjects.get_secret_value()
+        session,
+        get_settings().owner_subjects.get_secret_value(),
+        get_settings().owner_claim_expression,
     ).resolve_session(application_session)
     return SessionSchema(
         authenticated=True,

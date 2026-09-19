@@ -113,3 +113,15 @@ async def test_invalid_role_expression_is_rejected_before_persistence(
 
 def test_owner_allowlist_accepts_newlines_and_commas() -> None:
     assert parse_owner_subjects(" one, two\n three \n") == {"one", "two", "three"}
+
+
+async def test_owner_claim_expression_grants_owner(
+    database_session: AsyncSession,
+) -> None:
+    user = User(oidc_issuer="https://issuer.example", oidc_subject="not-allowlisted")
+    database_session.add(user)
+    await database_session.commit()
+    roles = await RoleResolutionService(
+        database_session, "other", "contains(realm_access.roles, 'ara-owner')"
+    ).resolve(user, {"realm_access": {"roles": ["ara-owner"]}})
+    assert roles.is_owner is True

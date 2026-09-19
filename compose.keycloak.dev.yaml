@@ -1,0 +1,31 @@
+# Keycloak 26.4.0 uses the current hostname-v2 options: hostname is the public
+# frontend URL while backend requests use its dedicated internal network.
+networks:
+  oidc_backchannel:
+    external: true
+    name: ara-dev-oidc-backchannel
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname=${ARA_DEV_KEYCLOAK_PUBLIC_URL}
+      - --http-port=8080
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - 127.0.0.1:${ARA_DEV_KEYCLOAK_PORT}:8080
+    volumes:
+      - ara-dev-keycloak-data:/opt/keycloak/data
+      - ./.dev/keycloak:/opt/keycloak/data/import:ro
+    networks:
+      default: {}
+      oidc_backchannel:
+        aliases:
+          - keycloak
+volumes:
+  ara-dev-keycloak-data:
+    name: ara-dev-keycloak-data

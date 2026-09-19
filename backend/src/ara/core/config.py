@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -35,12 +35,14 @@ _ENVIRONMENT_SETTINGS = {
     "ARA_DATABASE_URL": "database_url",
     "ARA_PUBLIC_URL": "public_url",
     "ARA_OIDC_ISSUER_URL": "oidc_issuer_url",
+    "ARA_OIDC_BACKCHANNEL_URL": "oidc_backchannel_url",
     "ARA_OIDC_CLIENT_ID": "oidc_client_id",
     "ARA_OIDC_SCOPES": "oidc_scopes",
     "ARA_AUDIT_RETENTION_DAYS": "audit_retention_days",
     "ARA_NOTIFICATION_REMINDER_OFFSETS_MINUTES": (
         "notification_reminder_offsets_minutes"
     ),
+    "ARA_OWNER_CLAIM_EXPRESSION": "owner_claim_expression",
 }
 
 
@@ -128,11 +130,13 @@ class Settings(BaseSettings):
     database_url: str = Field(default=DEFAULT_DATABASE_URL, min_length=1)
     public_url: AnyHttpUrl
     oidc_issuer_url: AnyHttpUrl
+    oidc_backchannel_url: AnyHttpUrl | None = None
     oidc_client_id: str = Field(min_length=1)
     oidc_scopes: tuple[str, ...] = ("openid", "profile", "email")
     oidc_client_secret: SecretStr
     session_secret: SecretStr
     owner_subjects: SecretStr
+    owner_claim_expression: str | None = None
     audit_retention_days: int = Field(default=365, gt=0)
     notification_reminder_offsets_minutes: tuple[int, ...] = (60, 15, 0)
 
@@ -173,6 +177,32 @@ class Settings(BaseSettings):
         if not value.get_secret_value():
             raise ValueError("must not be empty")
         return value
+
+    @model_validator(mode="after")
+    def validate_oidc_backchannel_and_owner_expression(self) -> Settings:
+        """Constrain a private OIDC route and reject invalid Owner expressions."""
+        if self.oidc_backchannel_url is not None:
+            public, backchannel = self.oidc_issuer_url, self.oidc_backchannel_url
+            if (
+                str(public.path or "").rstrip("/")
+                != str(backchannel.path or "").rstrip("/")
+                or backchannel.username
+                or backchannel.password
+                or backchannel.query
+                or backchannel.fragment
+            ):
+                raise ValueError(
+                    "oidc_backchannel_url must have the issuer realm path and no "
+                    "credentials, query, or fragment"
+                )
+        if self.owner_claim_expression is not None:
+            from ara.services.authorization import validate_role_expression
+
+            try:
+                validate_role_expression(self.owner_claim_expression)
+            except Exception as error:
+                raise ValueError("owner_claim_expression is invalid") from error
+        return self
 
     @classmethod
     def settings_customise_sources(

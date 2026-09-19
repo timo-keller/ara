@@ -3,6 +3,7 @@
 import hmac
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from authlib.jose import JoseError, JsonWebKey, jwt
@@ -36,10 +37,13 @@ class OidcClient:
 
     async def discover(self) -> dict[str, str]:
         issuer = str(self.settings.oidc_issuer_url).rstrip("/")
+        discovery_issuer = str(
+            self.settings.oidc_backchannel_url or self.settings.oidc_issuer_url
+        ).rstrip("/")
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
-                    f"{issuer}/.well-known/openid-configuration"
+                    f"{discovery_issuer}/.well-known/openid-configuration"
                 )
                 response.raise_for_status()
                 metadata = response.json()
@@ -63,7 +67,35 @@ class OidcClient:
                 "The identity provider is unavailable",
                 status_code=503,
             )
-        return {key: metadata[key] for key in required}
+        result = {key: metadata[key] for key in required}
+        if self.settings.oidc_backchannel_url is not None:
+            for key in ("token_endpoint", "jwks_uri"):
+                result[key] = self._backchannel_endpoint(result[key])
+        return result
+
+    def _backchannel_endpoint(self, endpoint: str) -> str:
+        """Rewrite only a public issuer-relative endpoint to the private base."""
+        public = urlsplit(str(self.settings.oidc_issuer_url).rstrip("/"))
+        backchannel = urlsplit(str(self.settings.oidc_backchannel_url).rstrip("/"))
+        candidate = urlsplit(endpoint)
+        public_path = public.path.rstrip("/")
+        if (
+            candidate.scheme != public.scheme
+            or candidate.netloc != public.netloc
+            or not candidate.path.startswith(f"{public_path}/")
+            or candidate.query
+            or candidate.fragment
+            or candidate.username
+            or candidate.password
+        ):
+            raise DomainError(
+                "authentication_unavailable",
+                "The identity provider is unavailable",
+                status_code=503,
+            )
+        return urlunsplit(
+            (backchannel.scheme, backchannel.netloc, candidate.path, "", "")
+        )
 
     async def exchange_code(self, code: str, metadata: Mapping[str, str]) -> str:
         try:
