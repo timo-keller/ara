@@ -18,42 +18,75 @@
   } @else if (!reservations().length) {
     <p>You do not have any reservations.</p>
   } @else {
-    <div class="reservation-list">
-      @for (reservation of reservations(); track reservation.id) {
-        <syn-card>
-          <h2 slot="header">
-            @if (reservation.asset_name) {
-              Asset
-              <a [routerLink]="['/assets', reservation.asset_id]">{{ reservation.asset_name }}</a>
-            } @else {
-              Asset unavailable
-            }
-          </h2>
-          <p>
-            <syn-badge>{{ reservation.status }}</syn-badge>
-          </p>
-          <p>
-            {{ reservation.starts_at | date: 'medium' }} to
-            {{ reservation.ends_at ? (reservation.ends_at | date: 'medium') : 'until returned' }}
-          </p>
-          <div class="actions">
-            @if (canExtend(reservation)) {
-              <syn-button type="button" (click)="openExtension(reservation)">Extend</syn-button>
-            }
-            @if (allowedActions().get(reservation.id)?.includes('return')) {
-              <syn-button type="button" (click)="confirm('return', reservation)"
-                >Return asset</syn-button
-              >
-            }
-            @if (allowedActions().get(reservation.id)?.includes('cancel')) {
-              <syn-button type="button" (click)="confirm('cancel', reservation)"
-                >Cancel reservation</syn-button
-              >
-            }
-          </div>
-        </syn-card>
-      }
+    <div class="reservation-results" aria-live="polite">
+      <table>
+        <thead>
+          <tr>
+            <th id="reservation-asset-name" scope="col">Asset name</th>
+            <th id="reservation-asset-type" scope="col">Type</th>
+            <th id="reservation-timespan" scope="col">Reservation timespan</th>
+            <th id="reservation-actions" scope="col">Actions and details</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (reservation of reservations(); track reservation.id) {
+            <tr>
+              <td data-label="Asset name" headers="reservation-asset-name">
+                @if (reservation.asset_name) {
+                  <a [routerLink]="['/assets', reservation.asset_id]">{{
+                    reservation.asset_name
+                  }}</a>
+                } @else {
+                  Asset unavailable
+                }
+              </td>
+              <td data-label="Type" headers="reservation-asset-type">
+                {{ reservation.asset_type || 'Unavailable' }}
+              </td>
+              <td data-label="Reservation timespan" headers="reservation-timespan">
+                {{ reservationTime(reservation) }}
+              </td>
+              <td data-label="Actions and details" headers="reservation-actions">
+                <div class="actions">
+                  <syn-badge>{{ reservation.status }}</syn-badge>
+                  @if (canExtend(reservation)) {
+                    <syn-button type="button" (click)="openExtension(reservation)"
+                      >Extend</syn-button
+                    >
+                  }
+                  @if (allowedActions().get(reservation.id)?.includes('return')) {
+                    <syn-button type="button" (click)="confirm('return', reservation)"
+                      >Return asset</syn-button
+                    >
+                  }
+                  @if (allowedActions().get(reservation.id)?.includes('cancel')) {
+                    <syn-button type="button" (click)="confirm('cancel', reservation)"
+                      >Cancel reservation</syn-button
+                    >
+                  }
+                  @if (reservation.asset_name) {
+                    <a
+                      [routerLink]="['/assets', reservation.asset_id]"
+                      [attr.aria-label]="'View details for ' + reservation.asset_name"
+                      >View details</a
+                    >
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </div>
+    <syn-pagination
+      aria-label="My reservation pages"
+      [currentPage]="page()"
+      [pageSize]="filters().limit"
+      [pageSizeOptions]="[10, 25, 50]"
+      [totalItems]="total()"
+      (synPaginationPageChangedEvent)="changePage($event)"
+      (synPaginationPageSizeChangedEvent)="changePageSize($event)"
+    ></syn-pagination>
   }
   <syn-dialog
     label="Extend reservation"

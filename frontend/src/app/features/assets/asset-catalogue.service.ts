@@ -47,9 +47,22 @@ export interface Reservation {
   id: string;
   asset_id: string;
   asset_name: string | null;
+  asset_type: string | null;
   starts_at: string;
   ends_at: string | null;
   status: 'active' | 'returned' | 'cancelled' | 'ended';
+}
+
+export interface ReservationFilters {
+  offset: number;
+  limit: number;
+}
+
+export interface ReservationPage {
+  items: Reservation[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 export interface ReservationCreate {
@@ -96,8 +109,10 @@ export class AssetCatalogueService {
     });
   }
 
-  mine() {
-    return this.http.get<{ items: Reservation[] }>('/api/reservations/mine');
+  mine(filters: ReservationFilters) {
+    return this.http.get<ReservationPage>('/api/reservations/mine', {
+      params: new HttpParams().set('offset', filters.offset).set('limit', filters.limit),
+    });
   }
 
   createReservation(payload: ReservationCreate) {

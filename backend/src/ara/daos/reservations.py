@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import Asset, Group, Reservation, ReservationStatus
 
+ReservationAssetRow = tuple[
+    Reservation, str | None, str | None, uuid.UUID | None, bool, bool
+]
+
 
 class ReservationDAO:
     """Reservation queries; callers own policy and transaction boundaries."""
@@ -25,7 +29,7 @@ class ReservationDAO:
 
     async def list_for_user_with_assets(
         self, *, user_id: uuid.UUID, offset: int, limit: int
-    ) -> tuple[list[tuple[Reservation, str | None, uuid.UUID | None, bool, bool]], int]:
+    ) -> tuple[list[ReservationAssetRow], int]:
         """Return one user's reservations with their asset visibility details."""
         statement = select(Reservation).where(Reservation.user_id == user_id)
         total = await self.session.scalar(
@@ -35,6 +39,7 @@ class ReservationDAO:
             select(
                 Reservation,
                 Asset.name,
+                Asset.asset_type,
                 Group.id,
                 Asset.archived_at.is_not(None),
                 Group.archived_at.is_not(None),

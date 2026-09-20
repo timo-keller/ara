@@ -49,6 +49,7 @@ class ReservationSchema(BaseModel):
     id: uuid.UUID
     asset_id: uuid.UUID
     asset_name: str | None = None
+    asset_type: str | None = None
     user_id: uuid.UUID
     starts_at: datetime
     ends_at: datetime | None

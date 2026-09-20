@@ -116,6 +116,33 @@ test('asset catalogue exposes responsive table results and keyboard detail navig
   await context.close();
 });
 
+test('My reservations exposes a responsive table with local times, lifecycle actions and details', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 480, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'alpha-user');
+  await page.goto(`${baseURL()}/reservations`);
+
+  const table = page.getByRole('table');
+  await expect(table).toBeVisible();
+  expect(await table.getByRole('columnheader').allTextContents()).toEqual([
+    'Asset name',
+    'Type',
+    'Reservation timespan',
+    'Actions and details',
+  ]);
+  await expect(table.getByRole('link', { name: 'Alpha Return Laptop', exact: true })).toBeVisible();
+  await expect(
+    table.getByRole('link', { name: 'View details for Alpha Return Laptop' }),
+  ).toBeVisible();
+  await expect(table.getByText('until returned')).toBeVisible();
+  await expect(table.getByRole('button', { name: 'Return asset' })).toBeVisible();
+  await expect(table.getByText(/\d{2}:\d{2}/)).toBeVisible();
+  expect(await table.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await context.close();
+});
+
 test('My reservations is the authenticated landing page and replaces legacy Home navigation', async ({
   page,
   context,

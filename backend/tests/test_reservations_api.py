@@ -144,6 +144,7 @@ def test_reservation_api_creation_access_schedule_and_pagination(
     assert len(mine["items"]) == 1
     assert mine["items"][0]["asset_id"] == laptop
     assert mine["items"][0]["asset_name"] == "Laptop"
+    assert mine["items"][0]["asset_type"] == "computer"
     schedule = client.get(
         f"/api/assets/{laptop}/reservations", params={"limit": 1}
     ).json()
@@ -169,11 +170,13 @@ def test_own_reservation_asset_names_follow_asset_visibility(
     visible = client.get("/api/reservations/mine").json()["items"][0]
     assert visible["asset_id"] == laptop
     assert visible["asset_name"] == "Laptop"
+    assert visible["asset_type"] == "computer"
 
     roles["value"] = EffectiveRoles(is_owner=False, group_roles={})
     scoped = client.get("/api/reservations/mine").json()["items"][0]
     assert scoped["asset_id"] == laptop
     assert scoped["asset_name"] is None
+    assert scoped["asset_type"] is None
 
     async def archive_asset() -> None:
         async with factory() as session:
@@ -189,6 +192,7 @@ def test_own_reservation_asset_names_follow_asset_visibility(
     unavailable = client.get("/api/reservations/mine").json()["items"][0]
     assert unavailable["asset_id"] == laptop
     assert unavailable["asset_name"] is None
+    assert unavailable["asset_type"] is None
 
 
 def test_reservation_lifecycle_api_routes(

@@ -139,12 +139,19 @@ class ReservationService:
         offset: int,
         limit: int,
     ) -> tuple[list[Reservation], int]:
-        """List an actor's reservations with names only for visible assets."""
+        """List an actor's reservations with metadata only for visible assets."""
         rows, total = await self.reservations.list_for_user_with_assets(
             user_id=user_id, offset=offset, limit=limit
         )
         reservations = []
-        for reservation, name, group_id, asset_archived, group_archived in rows:
+        for (
+            reservation,
+            name,
+            asset_type,
+            group_id,
+            asset_archived,
+            group_archived,
+        ) in rows:
             # Match AssetService.get visibility while retaining the reservation
             # record for its owner. A missing historical asset or group also has
             # no display name.
@@ -160,8 +167,10 @@ class ReservationService:
                 )
             ):
                 setattr(reservation, "asset_name", name)
+                setattr(reservation, "asset_type", asset_type)
             else:
                 setattr(reservation, "asset_name", None)
+                setattr(reservation, "asset_type", None)
             reservations.append(reservation)
         return reservations, total
 
