@@ -440,6 +440,24 @@ test('Audit history keeps its desktop surface fixed while event cards scroll', a
   const events = page.locator('.audit-results .events');
   const rail = page.locator('syn-side-nav');
   await expect(events.locator('syn-card').first()).toBeVisible();
+  const firstEventCard = events.locator('syn-card').first();
+  const firstEventTitle = firstEventCard.locator('> h2[slot="header"]');
+  await expect(firstEventTitle).toBeVisible();
+  expect(await firstEventTitle.evaluate((node) => getComputedStyle(node).marginBlockStart)).toBe(
+    '0px',
+  );
+  expect(await firstEventTitle.evaluate((node) => getComputedStyle(node).marginBlockEnd)).toBe(
+    '0px',
+  );
+  expect(
+    await firstEventCard.evaluate((node) => {
+      const header = node.shadowRoot?.querySelector('[part="header"]');
+      return header && getComputedStyle(header).paddingBlock;
+    }),
+  ).toBe('12px');
+  const changeDetails = firstEventCard.locator('syn-details');
+  await changeDetails.locator('[part="header"]').click();
+  await expect(changeDetails).toHaveAttribute('open', '');
   await expect(main).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(content).toHaveCSS('overflow-y', 'hidden');
   await expect(events).toHaveCSS('overflow-y', 'auto');
@@ -447,6 +465,11 @@ test('Audit history keeps its desktop surface fixed while event cards scroll', a
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
   ).toBe(true);
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.locator('syn-switch').locator('[part="control"]').click();
+  await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
+  await expect(firstEventTitle).toBeVisible();
 
   const mainBeforeScroll = await main.boundingBox();
   const railBeforeScroll = await rail.boundingBox();
@@ -458,10 +481,21 @@ test('Audit history keeps its desktop surface fixed while event cards scroll', a
 
   await page.setViewportSize({ width: 640, height: 720 });
   await expect(events).toHaveCSS('overflow-y', 'visible');
+  expect(await firstEventCard.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await expect(firstEventTitle).toBeVisible();
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
   ).toBe(true);
   await page.locator('syn-pagination[aria-label="Audit history pages"]').scrollIntoViewIfNeeded();
   await expect(page.locator('syn-pagination[aria-label="Audit history pages"]')).toBeVisible();
+
+  await page.goto(`${baseURL()}/administration`);
+  const administrationCardTitle = page.locator('.admin-grid syn-card > h2[slot="header"]').first();
+  await expect(administrationCardTitle).toBeVisible();
+  expect(
+    await administrationCardTitle.evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).marginBlockStart),
+    ),
+  ).toBeGreaterThan(0);
   await context.close();
 });

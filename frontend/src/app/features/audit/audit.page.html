@@ -93,7 +93,7 @@
     <div class="audit-results">
       <div class="events" aria-live="polite">
         @for (event of items(); track event.id) {
-          <syn-card
+          <syn-card class="audit-event-card"
             ><h2 slot="header">{{ event.action }} · {{ event.target_type }}</h2>
             <dl>
               <dt>Time</dt>

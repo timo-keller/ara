@@ -15,6 +15,15 @@
   margin-bottom: var(--syn-spacing-large);
 }
 
+/* Keep the card's token-based padding; only remove the heading's browser margin. */
+.audit-event-card {
+  --padding: var(--syn-spacing-large);
+}
+
+.audit-event-card > h2[slot='header'] {
+  margin-block: 0;
+}
+
 @media (min-width: 641px) {
   :host {
     display: flex;
