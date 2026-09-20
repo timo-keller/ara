@@ -22,6 +22,8 @@ const activeAsset = {
   access_instructions: null,
   webex_room_id: null,
   archived_at: null,
+  availability: 'reserved' as const,
+  reserved_by_display_name: 'Ada Lovelace',
 };
 
 class ResizeObserverStub {
@@ -86,6 +88,7 @@ describe('AssetAdministrationPage', () => {
       'group-admin',
     ]);
     expect(fixture.nativeElement.textContent).not.toContain('User group laptop');
+    expect(fixture.nativeElement.textContent).toContain('Reserved by Ada Lovelace');
     expect(fixture.nativeElement.textContent).toContain('Archived');
     expect(fixture.nativeElement.querySelectorAll('syn-input[type="password"]')).toHaveLength(0);
   });

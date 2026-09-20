@@ -63,6 +63,9 @@
               >
                 <strong>{{ asset.name }}</strong>
                 <span>{{ groupName(asset.group_id) }}</span>
+                @if (asset.reserved_by_display_name) {
+                  <span>Reserved by {{ asset.reserved_by_display_name }}</span>
+                }
                 <span class="badges">
                   <syn-badge>{{ asset.asset_type }}</syn-badge>
                   <syn-badge>{{ asset.archived_at ? 'Archived' : 'Active' }}</syn-badge>

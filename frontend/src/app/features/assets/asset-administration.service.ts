@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Asset, Group } from './asset-catalogue.service';
+import { Asset, CatalogueAsset, Group } from './asset-catalogue.service';
 
 export interface AssetDraftPayload {
   group_id: string;
@@ -26,7 +26,7 @@ export class AssetAdministrationService {
   }
 
   list(archived: boolean) {
-    return this.http.get<{ items: Asset[] }>('/api/assets', {
+    return this.http.get<{ items: CatalogueAsset[] }>('/api/assets', {
       params: new HttpParams().set('archived', archived).set('limit', 100),
     });
   }

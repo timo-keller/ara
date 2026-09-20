@@ -11,7 +11,7 @@ import { SynSelectComponent } from '@synergy-design-system/angular/components/se
 import { SynSpinnerComponent } from '@synergy-design-system/angular/components/spinner';
 import { SynTextareaComponent } from '@synergy-design-system/angular/components/textarea';
 import { AuthService } from '../../core/auth/auth.service';
-import { Asset, Group } from './asset-catalogue.service';
+import { Asset, CatalogueAsset, Group } from './asset-catalogue.service';
 import { AssetAdministrationService, AssetDraftPayload } from './asset-administration.service';
 
 interface AssetDraft extends AssetDraftPayload {
@@ -57,7 +57,7 @@ export class AssetAdministrationPage {
   private readonly administration = inject(AssetAdministrationService);
   private readonly auth = inject(AuthService);
   readonly groups = signal<Group[]>([]);
-  readonly assets = signal<Asset[]>([]);
+  readonly assets = signal<CatalogueAsset[]>([]);
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   readonly error = signal<string | null>(null);
   readonly draft = signal<AssetDraft>(emptyDraft());
