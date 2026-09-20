@@ -46,6 +46,11 @@
                 "glob": "admin_panel_settings.svg",
                 "input": "node_modules/@synergy-design-system/assets/src/sick2025/icons/outline",
                 "output": "assets/synergy-icons"
+              },
+              {
+                "glob": "history.svg",
+                "input": "node_modules/@synergy-design-system/assets/src/sick2025/icons/outline",
+                "output": "assets/synergy-icons"
               }
             ],
             "styles": [

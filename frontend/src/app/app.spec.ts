@@ -78,9 +78,14 @@ describe('App', () => {
     };
     const assetsIcon = navigationIconName('Assets');
     const manageAssetsIcon = navigationIconName('Manage assets');
+    const auditHistoryIcon = navigationIconName('Audit history');
+    const administrationIcon = navigationIconName('Administration');
     expect(assetsIcon).toBe('inventory');
     expect(manageAssetsIcon).toBe('admin_panel_settings');
     expect(assetsIcon).not.toBe(manageAssetsIcon);
+    expect(auditHistoryIcon).toBe('history');
+    expect(administrationIcon).toBe('settings');
+    expect(auditHistoryIcon).not.toBe(administrationIcon);
     TestBed.inject(NotificationService).notifications.set([
       {
         id: 'one',
