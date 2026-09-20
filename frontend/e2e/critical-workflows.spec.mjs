@@ -344,7 +344,9 @@ test('asset administration provides a keyboard-selectable responsive master-deta
   await context.close();
 });
 
-test('Administration content scrolls without moving the desktop rail', async ({ browser }) => {
+test('Administration content scrolls within its fixed desktop surface without moving the rail', async ({
+  browser,
+}) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
   await login(context, page, 'e2e-owner');
@@ -356,6 +358,18 @@ test('Administration content scrolls without moving the desktop rail', async ({ 
       body: JSON.stringify({ name: `Tall administration group ${index}` }),
     });
     expect(response.status).toBe(201);
+    const mapping = await csrfFetch(page, '/api/role-mappings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        group_id: response.body.id,
+        expression: 'true',
+        role: 'user',
+        priority: index,
+        enabled: true,
+      }),
+    });
+    expect(mapping.status).toBe(201);
   }
 
   await page.goto(`${baseURL()}/administration`);
@@ -366,9 +380,16 @@ test('Administration content scrolls without moving the desktop rail', async ({ 
 
   const shell = page.locator('.appshell');
   const content = page.locator('.appshell-content-inner');
+  const main = page.locator('.appshell-main');
+  const administrationContent = page.locator('.administration-content');
   const rail = page.locator('syn-side-nav');
   const logout = page.locator('syn-side-nav > syn-nav-item[slot="footer"]');
-  expect(await content.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  await expect(main).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(content).toHaveCSS('overflow-y', 'hidden');
+  await expect(administrationContent).toHaveCSS('overflow-y', 'auto');
+  expect(
+    await administrationContent.evaluate((node) => node.scrollHeight > node.clientHeight),
+  ).toBe(true);
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
   ).toBe(true);
@@ -379,14 +400,16 @@ test('Administration content scrolls without moving the desktop rail', async ({ 
   expect(railBox.y + railBox.height).toBeLessThanOrEqual(720);
   expect(logoutBox.y + logoutBox.height).toBeLessThanOrEqual(720);
 
-  await content.evaluate((node) => (node.scrollTop = node.scrollHeight));
-  expect(await content.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  const mainBeforeScroll = await main.boundingBox();
+  await administrationContent.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  expect(await administrationContent.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  expect(await main.boundingBox()).toEqual(mainBeforeScroll);
   const railAfterScroll = await rail.boundingBox();
   expect(railAfterScroll).not.toBeNull();
   expect(railAfterScroll.y + railAfterScroll.height).toBeLessThanOrEqual(720);
 
   await page.setViewportSize({ width: 640, height: 720 });
-  await expect(content).toHaveCSS('overflow-y', 'visible');
+  await expect(administrationContent).toHaveCSS('overflow-y', 'visible');
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
   ).toBe(true);

@@ -73,10 +73,12 @@
       <div
         class="appshell-content-inner"
         [class.appshell-content-inner--audit]="isCurrent('/audit')"
+        [class.appshell-content-inner--administration]="isCurrent('/administration')"
       >
         <main
           class="appshell-main"
           [class.appshell-main--audit]="isCurrent('/audit')"
+          [class.appshell-main--administration]="isCurrent('/administration')"
           tabindex="-1"
         >
           <router-outlet />

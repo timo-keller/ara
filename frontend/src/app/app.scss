@@ -68,6 +68,15 @@
     display: flex;
     min-height: 0;
   }
+
+  .appshell-content-inner--administration {
+    overflow: hidden;
+  }
+
+  .appshell-main--administration {
+    display: flex;
+    min-height: 0;
+  }
 }
 
 @media (max-width: 640px) {

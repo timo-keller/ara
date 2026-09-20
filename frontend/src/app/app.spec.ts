@@ -97,6 +97,18 @@ describe('App', () => {
     expect(auditHistoryIcon).toBe('history');
     expect(administrationIcon).toBe('settings');
     expect(auditHistoryIcon).not.toBe(administrationIcon);
+    fixture.componentInstance.currentUrl.set('/administration');
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement
+        .querySelector('.appshell-content-inner')
+        ?.classList.contains('appshell-content-inner--administration'),
+    ).toBe(true);
+    expect(
+      fixture.nativeElement
+        .querySelector('.appshell-main')
+        ?.classList.contains('appshell-main--administration'),
+    ).toBe(true);
     TestBed.inject(NotificationService).notifications.set([
       {
         id: 'one',
