@@ -11,6 +11,18 @@ import {
   ReservationsPage,
 } from './reservations.page';
 
+class ResizeObserverStub {
+  disconnect(): undefined {
+    return undefined;
+  }
+  observe(): undefined {
+    return undefined;
+  }
+  unobserve(): undefined {
+    return undefined;
+  }
+}
+
 const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 const active = {
   id: 'one',
@@ -27,6 +39,7 @@ describe('ReservationsPage', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
     await TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
@@ -150,10 +163,10 @@ describe('ReservationsPage', () => {
         offset: '25',
         limit: '25',
         asset_name: 'Lab',
-        lifecycle: ['future', 'invalid'],
+        lifecycle: ['future', 'invalid', 'current', 'future'],
         timespan_from: '2030-01-02T13:05:00Z',
       }),
-    ).toMatchObject({ offset: 25, limit: 25, asset_name: 'Lab', lifecycle: ['future'] });
+    ).toMatchObject({ offset: 25, limit: 25, asset_name: 'Lab', lifecycle: ['current', 'future'] });
     expect(
       reservationQueryParams({ ...reservationFiltersFromQuery({}), offset: 0, limit: 10 }),
     ).toEqual({
@@ -164,6 +177,47 @@ describe('ReservationsPage', () => {
       timespan_from: null,
       timespan_to: null,
       lifecycle: null,
+    });
+  });
+
+  it('renders an accessible multiselect lifecycle combobox', () => {
+    const fixture = TestBed.createComponent(ReservationsPage);
+    fixture.detectChanges();
+    http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({ items: [], total: 0 });
+    fixture.detectChanges();
+
+    const combobox = fixture.nativeElement.querySelector('syn-combobox');
+    expect(combobox).not.toBeNull();
+    expect(combobox.getAttribute('label')).toBe('Lifecycle');
+    expect(combobox.hasAttribute('multiple')).toBe(true);
+    expect(combobox.hasAttribute('clearable')).toBe(true);
+    expect(combobox.hasAttribute('restricted')).toBe(true);
+    expect(
+      [...fixture.nativeElement.querySelectorAll('syn-combobox syn-option')].map((option) =>
+        option.textContent.trim(),
+      ),
+    ).toEqual(['Current', 'Future', 'Expired', 'Returned', 'Cancelled', 'Ended']);
+    expect(fixture.nativeElement.textContent).not.toContain('Select all lifecycles');
+    expect(fixture.nativeElement.textContent).not.toContain('Choose one or more lifecycles');
+    expect(fixture.nativeElement.textContent).not.toContain('Clear lifecycle');
+  });
+
+  it('updates lifecycle filters through array values and stable query state', () => {
+    const fixture = TestBed.createComponent(ReservationsPage);
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture.detectChanges();
+    http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({ items: [], total: 0 });
+    fixture.componentInstance.filters.set({
+      ...fixture.componentInstance.filters(),
+      offset: 20,
+      lifecycle: ['future'],
+    });
+
+    fixture.componentInstance.updateLifecycles(['ended', 'current', 'ended', 'invalid']);
+    expect(navigate).toHaveBeenLastCalledWith([], {
+      relativeTo: expect.anything(),
+      queryParams: expect.objectContaining({ offset: null, lifecycle: ['current', 'ended'] }),
     });
   });
 });

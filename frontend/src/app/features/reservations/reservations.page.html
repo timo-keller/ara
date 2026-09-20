@@ -33,19 +33,20 @@
       [value]="utcToLocalDateTime(filters().timespan_to)"
       (synChangeEvent)="updateTimeFilter('timespan_to', $any($event.target).value)"
     ></syn-input>
-    <fieldset>
-      <legend>Lifecycle</legend>
-      @for (lifecycle of lifecycleOptions; track lifecycle) {
-        <label
-          ><input
-            type="checkbox"
-            [checked]="filters().lifecycle.includes(lifecycle)"
-            (change)="toggleLifecycle(lifecycle, $any($event.target).checked)"
-          />
-          {{ lifecycle }}</label
-        >
-      }
-    </fieldset>
+    <div class="lifecycle-filter">
+      <syn-combobox
+        label="Lifecycle"
+        [value]="filters().lifecycle"
+        (valueChange)="updateLifecycles($event)"
+        multiple
+        clearable
+        restricted
+      >
+        @for (lifecycle of lifecycleOptions; track lifecycle) {
+          <syn-option [value]="lifecycle">{{ lifecycleOptionLabel(lifecycle) }}</syn-option>
+        }
+      </syn-combobox>
+    </div>
     @if (hasFilters()) {
       <syn-button type="button" variant="text" (click)="clearFilters()">Clear filters</syn-button>
     }

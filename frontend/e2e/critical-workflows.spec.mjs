@@ -120,7 +120,7 @@ test('asset catalogue exposes responsive table results and keyboard detail navig
   await context.close();
 });
 
-test('My reservations exposes a responsive table with local times, lifecycle actions and details', async ({
+test('My reservations exposes keyboard lifecycle filtering, history restoration, and a responsive table', async ({
   browser,
 }) => {
   const context = await browser.newContext({ viewport: { width: 480, height: 720 } });
@@ -134,7 +134,35 @@ test('My reservations exposes a responsive table with local times, lifecycle act
   await expect(filters.getByLabel('Asset type')).toBeVisible();
   await expect(filters.getByLabel('From')).toBeVisible();
   await expect(filters.getByLabel('To')).toBeVisible();
-  await expect(filters.getByRole('checkbox', { name: 'current' })).not.toBeChecked();
+  const lifecycle = filters.getByRole('combobox', { name: 'Lifecycle' });
+  await expect(lifecycle).toBeVisible();
+  await expect(filters.getByText('No lifecycle selected', { exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Select all lifecycles' })).toBeEnabled();
+  await expect(filters.getByRole('button', { name: 'Clear lifecycle' })).toBeDisabled();
+
+  await lifecycle.focus();
+  await lifecycle.press('ArrowDown');
+  await lifecycle.press('Enter');
+  await lifecycle.press('ArrowDown');
+  await lifecycle.press('Enter');
+  await lifecycle.press('Escape');
+  await expect(lifecycle).toBeFocused();
+  await expect(filters.getByText('2 of 6 lifecycles selected', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/lifecycle=current.*lifecycle=future/);
+
+  await filters.getByRole('button', { name: 'Select all lifecycles' }).focus();
+  await filters.getByRole('button', { name: 'Select all lifecycles' }).press('Enter');
+  await expect(filters.getByText('All lifecycles', { exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Select all lifecycles' })).toBeDisabled();
+  await filters.getByRole('button', { name: 'Clear lifecycle' }).focus();
+  await filters.getByRole('button', { name: 'Clear lifecycle' }).press('Enter');
+  await expect(filters.getByText('No lifecycle selected', { exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Clear lifecycle' })).toBeDisabled();
+  await page.goBack();
+  await expect(filters.getByText('All lifecycles', { exact: true })).toBeVisible();
+  await page.goForward();
+  await expect(filters.getByText('No lifecycle selected', { exact: true })).toBeVisible();
+  expect(await filters.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
 
   const table = page.getByRole('table');
   await expect(table).toBeVisible();

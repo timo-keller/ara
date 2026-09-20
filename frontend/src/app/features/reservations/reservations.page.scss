@@ -9,10 +9,15 @@
   gap: var(--syn-spacing-small);
 }
 
-.reservation-filters fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--syn-spacing-small);
+.lifecycle-filter {
+  flex: 1 1 20rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.lifecycle-filter syn-combobox {
+  max-width: 100%;
+  width: 100%;
 }
 
 .reservation-results table {

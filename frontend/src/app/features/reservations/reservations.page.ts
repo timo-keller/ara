@@ -3,8 +3,10 @@ import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
 import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
+import { SynComboboxComponent } from '@synergy-design-system/angular/components/combobox';
 import { SynDialogComponent } from '@synergy-design-system/angular/components/dialog';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
+import { SynOptionComponent } from '@synergy-design-system/angular/components/option';
 import { SynPaginationComponent } from '@synergy-design-system/angular/components/pagination';
 import { SynSpinnerComponent } from '@synergy-design-system/angular/components/spinner';
 import {
@@ -24,6 +26,20 @@ const lifecycles: ReservationLifecycle[] = [
   'cancelled',
   'ended',
 ];
+
+function normalizeLifecycles(values: unknown[]): ReservationLifecycle[] {
+  const selected = new Set(
+    values.filter(
+      (value): value is ReservationLifecycle =>
+        typeof value === 'string' && lifecycles.includes(value as ReservationLifecycle),
+    ),
+  );
+  return lifecycles.filter((lifecycle) => selected.has(lifecycle));
+}
+
+function lifecycleOptionLabel(lifecycle: ReservationLifecycle): string {
+  return lifecycle.charAt(0).toUpperCase() + lifecycle.slice(1);
+}
 
 const defaults: ReservationFilters = {
   offset: 0,
@@ -58,17 +74,14 @@ export function reservationFiltersFromQuery(params: Params): ReservationFilters 
     asset_type: typeof params['asset_type'] === 'string' ? params['asset_type'] : '',
     timespan_from: validUtc(params['timespan_from']),
     timespan_to: validUtc(params['timespan_to']),
-    lifecycle: (Array.isArray(params['lifecycle'])
-      ? params['lifecycle']
-      : [params['lifecycle']]
-    ).filter(
-      (value): value is ReservationLifecycle =>
-        typeof value === 'string' && lifecycles.includes(value as ReservationLifecycle),
+    lifecycle: normalizeLifecycles(
+      Array.isArray(params['lifecycle']) ? params['lifecycle'] : [params['lifecycle']],
     ),
   };
 }
 
 export function reservationQueryParams(filters: ReservationFilters): Params {
+  const lifecycle = normalizeLifecycles(filters.lifecycle);
   return {
     offset: filters.offset || null,
     limit: filters.limit === 10 ? null : filters.limit,
@@ -76,7 +89,7 @@ export function reservationQueryParams(filters: ReservationFilters): Params {
     asset_type: filters.asset_type.trim() || null,
     timespan_from: filters.timespan_from || null,
     timespan_to: filters.timespan_to || null,
-    lifecycle: filters.lifecycle.length ? filters.lifecycle : null,
+    lifecycle: lifecycle.length ? lifecycle : null,
   };
 }
 
@@ -116,8 +129,10 @@ export function utcToLocalDateTime(value: string): string {
     SynAlertComponent,
     SynBadgeComponent,
     SynButtonComponent,
+    SynComboboxComponent,
     SynDialogComponent,
     SynInputComponent,
+    SynOptionComponent,
     SynPaginationComponent,
     SynSpinnerComponent,
   ],
@@ -139,6 +154,7 @@ export class ReservationsPage {
   readonly extensionEnd = signal('');
   readonly filters = signal<ReservationFilters>(defaults);
   readonly lifecycleOptions = lifecycles;
+  readonly lifecycleOptionLabel = lifecycleOptionLabel;
   readonly lifecycleLabel = lifecycleLabel;
   readonly utcToLocalDateTime = utcToLocalDateTime;
   readonly page = computed(() => Math.floor(this.filters().offset / this.filters().limit) + 1);
@@ -184,10 +200,9 @@ export class ReservationsPage {
     this.navigate({ ...this.filters(), [name]: localDateTimeToUtc(localValue) || '', offset: 0 });
   }
 
-  toggleLifecycle(lifecycle: ReservationLifecycle, checked: boolean): void {
-    const selected = this.filters().lifecycle.filter((value) => value !== lifecycle);
-    if (checked) selected.push(lifecycle);
-    this.navigate({ ...this.filters(), lifecycle: selected, offset: 0 });
+  updateLifecycles(value: string | number | (string | number)[]): void {
+    if (!Array.isArray(value)) return;
+    this.navigate({ ...this.filters(), lifecycle: normalizeLifecycles(value), offset: 0 });
   }
 
   hasFilters(): boolean {
