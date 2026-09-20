@@ -3,7 +3,12 @@
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  margin: 1.5rem 0;
+}
+.filters {
+  margin: var(--syn-spacing-small) 0 var(--syn-spacing-large);
+}
+.asset-grid {
+  margin: var(--syn-spacing-large) 0;
 }
 .asset-grid syn-card {
   display: block;

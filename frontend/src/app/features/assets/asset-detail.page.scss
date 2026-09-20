@@ -2,7 +2,7 @@
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  margin-top: 1.5rem;
+  margin-top: var(--syn-spacing-small);
 }
 .detail-grid syn-card {
   display: block;

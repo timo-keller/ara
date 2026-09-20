@@ -1,8 +1,10 @@
-<section aria-labelledby="audit-heading">
+<section class="route-page" aria-labelledby="audit-heading">
   <h1 id="audit-heading">Audit history</h1>
-  <p>Changes are shown newest first. State snapshots exclude protected operational data.</p>
+  <p class="route-introduction">
+    Changes are shown newest first. State snapshots exclude protected operational data.
+  </p>
   <form
-    class="filters"
+    class="filters route-content"
     aria-label="Filter audit history"
     (submit)="$event.preventDefault(); load()"
   >

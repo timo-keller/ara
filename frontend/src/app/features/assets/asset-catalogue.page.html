@@ -1,11 +1,15 @@
-<section aria-labelledby="assets-heading">
+<section class="route-page" aria-labelledby="assets-heading">
   <h1 id="assets-heading">Assets</h1>
-  <p>
+  <p class="route-introduction">
     Browse active assets available to your groups. Availability reflects reservations in progress
     now.
   </p>
 
-  <form class="filters" aria-label="Filter assets" (submit)="$event.preventDefault(); load()">
+  <form
+    class="filters route-content"
+    aria-label="Filter assets"
+    (submit)="$event.preventDefault(); load()"
+  >
     <syn-input
       label="Search assets"
       clearable

@@ -3,7 +3,7 @@
   display: grid;
   gap: 1.5rem;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-  margin: 1.5rem 0;
+  margin: var(--syn-spacing-small) 0 var(--syn-spacing-large);
 }
 
 syn-card,

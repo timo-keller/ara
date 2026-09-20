@@ -1,6 +1,9 @@
-<section class="asset-administration-page" aria-labelledby="asset-administration-heading">
+<section
+  class="asset-administration-page route-page"
+  aria-labelledby="asset-administration-heading"
+>
   <h1 id="asset-administration-heading">Asset administration</h1>
-  <p>
+  <p class="route-introduction">
     Manage assets in your authorized groups. Remote-access details are descriptive only; never enter
     passwords, keys, tokens, or credentials.
   </p>
@@ -9,7 +12,7 @@
     <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
   }
 
-  <div class="asset-workspace">
+  <div class="asset-workspace route-content">
     <section class="asset-list-pane" aria-labelledby="managed-assets-heading">
       <div class="list-heading">
         <h2 id="managed-assets-heading">Managed assets</h2>

@@ -1,6 +1,8 @@
-<section aria-labelledby="administration-heading">
+<section class="route-page" aria-labelledby="administration-heading">
   <h1 id="administration-heading">Group administration</h1>
-  <p>Only Owners can administer groups and the role mappings that grant group access.</p>
+  <p class="route-introduction">
+    Only Owners can administer groups and the role mappings that grant group access.
+  </p>
 
   @if (error()) {
     <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
@@ -22,7 +24,7 @@
     </syn-alert>
   }
 
-  <div class="admin-grid">
+  <div class="admin-grid route-content">
     <syn-card>
       <h2 slot="header">{{ groupDraft().id ? 'Edit group' : 'Create group' }}</h2>
       <form (submit)="$event.preventDefault(); saveGroup()">

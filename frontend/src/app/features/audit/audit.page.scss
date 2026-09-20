@@ -5,6 +5,10 @@
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   margin-bottom: var(--syn-spacing-large);
 }
+
+.filters {
+  margin-top: var(--syn-spacing-small);
+}
 .events {
   display: grid;
   gap: var(--syn-spacing-large);

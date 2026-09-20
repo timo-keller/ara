@@ -11,7 +11,7 @@ syn-card {
   display: grid;
   gap: 1.5rem;
   grid-template-columns: minmax(16rem, 0.8fr) minmax(0, 1.6fr);
-  margin: 1.5rem 0;
+  margin: 0 0 var(--syn-spacing-large);
 }
 .asset-list-pane {
   min-width: 0;

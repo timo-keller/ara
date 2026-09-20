@@ -27,6 +27,19 @@ async function csrfFetch(page, path, options = {}) {
   );
 }
 
+async function expectCompactRouteGap(page, content) {
+  const introduction = page.locator('.route-introduction');
+  const [introductionBox, contentBox] = await Promise.all([
+    introduction.boundingBox(),
+    content.boundingBox(),
+  ]);
+  expect(introductionBox).not.toBeNull();
+  expect(contentBox).not.toBeNull();
+  const gap = contentBox.y - (introductionBox.y + introductionBox.height);
+  expect(gap).toBeGreaterThanOrEqual(8);
+  expect(gap).toBeLessThanOrEqual(12);
+}
+
 test('authenticated discovery, future/open-ended conflicts, extension, cancellation and return', async ({
   page,
   context,
@@ -91,6 +104,31 @@ test('My reservations is the authenticated landing page and replaces legacy Home
   await page.goto(`${baseURL()}/home`);
   await expect(page).toHaveURL(`${baseURL()}/reservations`);
   await expect(reservationsNavigation).toHaveAttribute('current', '');
+});
+
+test('authenticated route introductions use the compact heading-to-content rhythm', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'e2e-owner');
+
+  await page.goto(`${baseURL()}/audit`);
+  await expect(page.getByRole('heading', { name: 'Audit history' })).toBeVisible();
+  await expectCompactRouteGap(page, page.locator('.filters'));
+
+  await page.goto(`${baseURL()}/asset-administration`);
+  await expect(page.getByRole('heading', { name: 'Asset administration' })).toBeVisible();
+  await expectCompactRouteGap(page, page.locator('.asset-workspace'));
+
+  await page.goto(`${baseURL()}/assets`);
+  await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
+  await expectCompactRouteGap(page, page.locator('.filters'));
+
+  await page.goto(`${baseURL()}/administration`);
+  await expect(page.getByRole('heading', { name: 'Group administration' })).toBeVisible();
+  await expectCompactRouteGap(page, page.locator('.admin-grid'));
+  await context.close();
 });
 
 test('settings menu exposes notifications and preserves compact mode', async ({

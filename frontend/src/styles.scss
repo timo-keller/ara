@@ -5,3 +5,12 @@ html {
 body {
   margin: 0;
 }
+
+/* Keep route titles close to their introduction while leaving component internals alone. */
+.route-page > h1 {
+  margin-block-end: var(--syn-spacing-small);
+}
+
+.route-introduction {
+  margin-block: 0 var(--syn-spacing-small);
+}
