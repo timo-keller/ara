@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import Asset, Group, Reservation, ReservationStatus
@@ -28,10 +28,84 @@ class ReservationDAO:
         return await self.session.get(Reservation, reservation_id)
 
     async def list_for_user_with_assets(
-        self, *, user_id: uuid.UUID, offset: int, limit: int
+        self,
+        *,
+        user_id: uuid.UUID,
+        offset: int,
+        limit: int,
+        now: datetime,
+        is_owner: bool,
+        group_ids: tuple[uuid.UUID, ...],
+        admin_group_ids: tuple[uuid.UUID, ...],
+        asset_name: str | None = None,
+        asset_type: str | None = None,
+        timespan_from: datetime | None = None,
+        timespan_to: datetime | None = None,
+        lifecycle: tuple[str, ...] = (),
     ) -> tuple[list[ReservationAssetRow], int]:
         """Return one user's reservations with their asset visibility details."""
-        statement = select(Reservation).where(Reservation.user_id == user_id)
+        filters = [Reservation.user_id == user_id]
+        if timespan_to is not None:
+            filters.append(Reservation.starts_at <= timespan_to)
+        if timespan_from is not None:
+            filters.append(
+                or_(Reservation.ends_at.is_(None), Reservation.ends_at >= timespan_from)
+            )
+        if lifecycle:
+            categories = []
+            if "current" in lifecycle:
+                categories.append(
+                    and_(
+                        Reservation.status == ReservationStatus.ACTIVE,
+                        Reservation.starts_at <= now,
+                        or_(Reservation.ends_at.is_(None), Reservation.ends_at > now),
+                    )
+                )
+            if "future" in lifecycle:
+                categories.append(
+                    and_(
+                        Reservation.status == ReservationStatus.ACTIVE,
+                        Reservation.starts_at > now,
+                    )
+                )
+            if "expired" in lifecycle:
+                categories.append(
+                    and_(
+                        Reservation.status == ReservationStatus.ACTIVE,
+                        Reservation.ends_at.is_not(None),
+                        Reservation.ends_at <= now,
+                    )
+                )
+            for name, status in (
+                ("returned", ReservationStatus.RETURNED),
+                ("cancelled", ReservationStatus.CANCELLED),
+                ("ended", ReservationStatus.ENDED),
+            ):
+                if name in lifecycle:
+                    categories.append(Reservation.status == status)
+            filters.append(or_(*categories))
+        if asset_name is not None or asset_type is not None:
+            # Metadata predicates use precisely the policy used to expose names below.
+            visible = (
+                true()
+                if is_owner
+                else and_(
+                    Group.id.in_(group_ids),
+                    Group.archived_at.is_(None),
+                    or_(Asset.archived_at.is_(None), Group.id.in_(admin_group_ids)),
+                )
+            )
+            filters.append(visible)
+            if asset_name is not None:
+                filters.append(Asset.name.ilike(f"%{asset_name}%"))
+            if asset_type is not None:
+                filters.append(Asset.asset_type == asset_type)
+        statement = (
+            select(Reservation)
+            .outerjoin(Asset, Reservation.asset_id == Asset.id)
+            .outerjoin(Group, Asset.group_id == Group.id)
+            .where(*filters)
+        )
         total = await self.session.scalar(
             select(func.count()).select_from(statement.subquery())
         )
@@ -46,7 +120,7 @@ class ReservationDAO:
             )
             .outerjoin(Asset, Reservation.asset_id == Asset.id)
             .outerjoin(Group, Asset.group_id == Group.id)
-            .where(Reservation.user_id == user_id)
+            .where(*filters)
             .order_by(Reservation.starts_at.desc(), Reservation.id.desc())
             .offset(offset)
             .limit(limit)

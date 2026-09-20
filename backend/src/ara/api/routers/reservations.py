@@ -1,7 +1,8 @@
 """HTTP transport endpoints for reservations."""
 
 import uuid
-from typing import Annotated
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 
 from fastapi import Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from ara.api.schemas.reservations import (
     ReservationListSchema,
     ReservationSchema,
 )
+from ara.core.errors import DomainError
 from ara.domain.models import User
 from ara.infrastructure.database import get_session
 from ara.services.audit import AuditContext
@@ -119,9 +121,42 @@ async def list_own_reservations(
     session: Annotated[AsyncSession, Depends(get_session)],
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    asset_name: str | None = None,
+    asset_type: str | None = None,
+    timespan_from: datetime | None = None,
+    timespan_to: datetime | None = None,
+    lifecycle: Annotated[
+        list[Literal["current", "future", "expired", "returned", "cancelled", "ended"]]
+        | None,
+        Query(),
+    ] = None,
 ) -> ReservationListSchema:
+    for name, value in (("timespan_from", timespan_from), ("timespan_to", timespan_to)):
+        if value is not None and (
+            value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value)
+        ):
+            raise DomainError(
+                "reservation_timestamp_not_utc", f"{name} must be timezone-aware UTC"
+            )
+    if (
+        timespan_from is not None
+        and timespan_to is not None
+        and timespan_from > timespan_to
+    ):
+        raise DomainError(
+            "reservation_invalid_timespan",
+            "timespan_from must not be after timespan_to",
+        )
     reservations, total = await ReservationService(session).list_own(
-        roles, user_id=user.id, offset=offset, limit=limit
+        roles,
+        user_id=user.id,
+        offset=offset,
+        limit=limit,
+        asset_name=asset_name,
+        asset_type=asset_type,
+        timespan_from=timespan_from,
+        timespan_to=timespan_to,
+        lifecycle=tuple(lifecycle or ()),
     )
     return ReservationListSchema(
         items=[_reservation_schema(reservation) for reservation in reservations],

@@ -54,6 +54,7 @@ class ReservationSchema(BaseModel):
     starts_at: datetime
     ends_at: datetime | None
     status: ReservationStatus
+    lifecycle: str | None = None
     created_at: datetime
     updated_at: datetime
     returned_at: datetime | None

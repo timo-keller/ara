@@ -10,11 +10,40 @@ import { SynSpinnerComponent } from '@synergy-design-system/angular/components/s
 import {
   Reservation,
   ReservationFilters,
+  ReservationLifecycle,
   AssetCatalogueService,
 } from '../assets/asset-catalogue.service';
 import { localDateTimeToUtc } from '../assets/asset-detail.page';
 
 type Action = 'return' | 'cancel';
+const lifecycles: ReservationLifecycle[] = [
+  'current',
+  'future',
+  'expired',
+  'returned',
+  'cancelled',
+  'ended',
+];
+
+const defaults: ReservationFilters = {
+  offset: 0,
+  limit: 10,
+  asset_name: '',
+  asset_type: '',
+  timespan_from: '',
+  timespan_to: '',
+  lifecycle: [],
+};
+
+function validUtc(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !/Z$|\+00:00$/.test(value) ||
+    Number.isNaN(new Date(value).valueOf())
+  )
+    return '';
+  return new Date(value).toISOString();
+}
 
 export function reservationFiltersFromQuery(params: Params): ReservationFilters {
   const number = (name: string, fallback: number, min: number, max: number) => {
@@ -22,8 +51,20 @@ export function reservationFiltersFromQuery(params: Params): ReservationFilters 
     return Number.isInteger(value) && value >= min && value <= max ? value : fallback;
   };
   return {
-    offset: number('offset', 0, 0, Number.MAX_SAFE_INTEGER),
-    limit: number('limit', 10, 1, 100),
+    ...defaults,
+    offset: number('offset', defaults.offset, 0, Number.MAX_SAFE_INTEGER),
+    limit: number('limit', defaults.limit, 1, 100),
+    asset_name: typeof params['asset_name'] === 'string' ? params['asset_name'] : '',
+    asset_type: typeof params['asset_type'] === 'string' ? params['asset_type'] : '',
+    timespan_from: validUtc(params['timespan_from']),
+    timespan_to: validUtc(params['timespan_to']),
+    lifecycle: (Array.isArray(params['lifecycle'])
+      ? params['lifecycle']
+      : [params['lifecycle']]
+    ).filter(
+      (value): value is ReservationLifecycle =>
+        typeof value === 'string' && lifecycles.includes(value as ReservationLifecycle),
+    ),
   };
 }
 
@@ -31,6 +72,11 @@ export function reservationQueryParams(filters: ReservationFilters): Params {
   return {
     offset: filters.offset || null,
     limit: filters.limit === 10 ? null : filters.limit,
+    asset_name: filters.asset_name.trim() || null,
+    asset_type: filters.asset_type.trim() || null,
+    timespan_from: filters.timespan_from || null,
+    timespan_to: filters.timespan_to || null,
+    lifecycle: filters.lifecycle.length ? filters.lifecycle : null,
   };
 }
 
@@ -45,12 +91,23 @@ export function localReservationTime(value: string): string {
   }).format(timestamp);
 }
 
-export function allowedReservationActions(reservation: Reservation, now = new Date()): Action[] {
+export function allowedReservationActions(reservation: Reservation): Action[] {
   if (reservation.status !== 'active') return [];
-  const instant = now.getTime();
-  if (new Date(reservation.starts_at).getTime() > instant) return ['cancel'];
-  if (!reservation.ends_at || new Date(reservation.ends_at).getTime() > instant) return ['return'];
+  if (reservation.lifecycle === 'future') return ['cancel'];
+  if (reservation.lifecycle === 'current') return ['return'];
   return [];
+}
+
+export function lifecycleLabel(reservation: Reservation): string {
+  const lifecycle = reservation.lifecycle || reservation.status;
+  return lifecycle.charAt(0).toUpperCase() + lifecycle.slice(1);
+}
+
+export function utcToLocalDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return '';
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.valueOf() - offset).toISOString().slice(0, 16);
 }
 
 @Component({
@@ -80,7 +137,10 @@ export class ReservationsPage {
   readonly pendingAction = signal<{ action: Action; reservation: Reservation } | null>(null);
   readonly extensionFor = signal<Reservation | null>(null);
   readonly extensionEnd = signal('');
-  readonly filters = signal<ReservationFilters>({ offset: 0, limit: 10 });
+  readonly filters = signal<ReservationFilters>(defaults);
+  readonly lifecycleOptions = lifecycles;
+  readonly lifecycleLabel = lifecycleLabel;
+  readonly utcToLocalDateTime = utcToLocalDateTime;
   readonly page = computed(() => Math.floor(this.filters().offset / this.filters().limit) + 1);
   readonly allowedActions = computed(
     () =>
@@ -114,6 +174,35 @@ export class ReservationsPage {
 
   canExtend(reservation: Reservation): boolean {
     return reservation.status === 'active' && reservation.ends_at !== null;
+  }
+
+  updateTextFilter(name: 'asset_name' | 'asset_type', value: string): void {
+    this.navigate({ ...this.filters(), [name]: value, offset: 0 });
+  }
+
+  updateTimeFilter(name: 'timespan_from' | 'timespan_to', localValue: string): void {
+    this.navigate({ ...this.filters(), [name]: localDateTimeToUtc(localValue) || '', offset: 0 });
+  }
+
+  toggleLifecycle(lifecycle: ReservationLifecycle, checked: boolean): void {
+    const selected = this.filters().lifecycle.filter((value) => value !== lifecycle);
+    if (checked) selected.push(lifecycle);
+    this.navigate({ ...this.filters(), lifecycle: selected, offset: 0 });
+  }
+
+  hasFilters(): boolean {
+    const filters = this.filters();
+    return !!(
+      filters.asset_name ||
+      filters.asset_type ||
+      filters.timespan_from ||
+      filters.timespan_to ||
+      filters.lifecycle.length
+    );
+  }
+
+  clearFilters(): void {
+    this.navigate({ ...defaults, limit: this.filters().limit });
   }
 
   reservationTime(reservation: Reservation): string {

@@ -52,11 +52,20 @@ export interface Reservation {
   starts_at: string;
   ends_at: string | null;
   status: 'active' | 'returned' | 'cancelled' | 'ended';
+  lifecycle: ReservationLifecycle | null;
 }
+
+export type ReservationLifecycle =
+  'current' | 'future' | 'expired' | 'returned' | 'cancelled' | 'ended';
 
 export interface ReservationFilters {
   offset: number;
   limit: number;
+  asset_name: string;
+  asset_type: string;
+  timespan_from: string;
+  timespan_to: string;
+  lifecycle: ReservationLifecycle[];
 }
 
 export interface ReservationPage {
@@ -112,7 +121,7 @@ export class AssetCatalogueService {
 
   mine(filters: ReservationFilters) {
     return this.http.get<ReservationPage>('/api/reservations/mine', {
-      params: new HttpParams().set('offset', filters.offset).set('limit', filters.limit),
+      params: reservationQuery(filters),
     });
   }
 
@@ -131,4 +140,14 @@ export class AssetCatalogueService {
   cancelReservation(reservationId: string) {
     return this.http.post<Reservation>(`/api/reservations/${reservationId}/cancel`, {});
   }
+}
+
+export function reservationQuery(filters: ReservationFilters): HttpParams {
+  let params = new HttpParams().set('offset', filters.offset).set('limit', filters.limit);
+  if (filters.asset_name.trim()) params = params.set('asset_name', filters.asset_name.trim());
+  if (filters.asset_type.trim()) params = params.set('asset_type', filters.asset_type.trim());
+  if (filters.timespan_from) params = params.set('timespan_from', filters.timespan_from);
+  if (filters.timespan_to) params = params.set('timespan_to', filters.timespan_to);
+  for (const lifecycle of filters.lifecycle) params = params.append('lifecycle', lifecycle);
+  return params;
 }

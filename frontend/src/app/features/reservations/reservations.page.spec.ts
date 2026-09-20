@@ -5,6 +5,7 @@ import { provideRouter, Router } from '@angular/router';
 import {
   allowedReservationActions,
   localReservationTime,
+  lifecycleLabel,
   reservationFiltersFromQuery,
   reservationQueryParams,
   ReservationsPage,
@@ -19,6 +20,7 @@ const active = {
   starts_at: future,
   ends_at: future,
   status: 'active' as const,
+  lifecycle: 'future' as const,
 };
 
 describe('ReservationsPage', () => {
@@ -36,12 +38,8 @@ describe('ReservationsPage', () => {
   it('only offers lifecycle actions allowed by the reservation state and time', () => {
     expect(allowedReservationActions({ ...active, status: 'returned' })).toEqual([]);
     expect(allowedReservationActions(active)).toEqual(['cancel']);
-    expect(
-      allowedReservationActions({
-        ...active,
-        starts_at: new Date(Date.now() - 1000).toISOString(),
-      }),
-    ).toEqual(['return']);
+    expect(allowedReservationActions({ ...active, lifecycle: 'current' })).toEqual(['return']);
+    expect(lifecycleLabel(active)).toBe('Future');
   });
 
   it('displays the API-provided asset name and an accessible unavailable fallback', () => {
@@ -118,12 +116,28 @@ describe('ReservationsPage', () => {
     fixture.componentInstance.changePage({ detail: { currentPage: 2 } } as CustomEvent);
     expect(navigate).toHaveBeenLastCalledWith([], {
       relativeTo: expect.anything(),
-      queryParams: { offset: 10, limit: null },
+      queryParams: {
+        offset: 10,
+        limit: null,
+        asset_name: null,
+        asset_type: null,
+        timespan_from: null,
+        timespan_to: null,
+        lifecycle: null,
+      },
     });
     fixture.componentInstance.changePageSize({ detail: { currentPageSize: 25 } } as CustomEvent);
     expect(navigate).toHaveBeenLastCalledWith([], {
       relativeTo: expect.anything(),
-      queryParams: { offset: null, limit: 25 },
+      queryParams: {
+        offset: null,
+        limit: 25,
+        asset_name: null,
+        asset_type: null,
+        timespan_from: null,
+        timespan_to: null,
+        lifecycle: null,
+      },
     });
   });
 
@@ -131,10 +145,25 @@ describe('ReservationsPage', () => {
     const formatted = localReservationTime('2030-01-02T13:05:00Z');
     expect(formatted).toMatch(/\d{2}:\d{2}/);
     expect(formatted).not.toMatch(/AM|PM/);
-    expect(reservationFiltersFromQuery({ offset: '25', limit: '25' })).toEqual({
-      offset: 25,
-      limit: 25,
+    expect(
+      reservationFiltersFromQuery({
+        offset: '25',
+        limit: '25',
+        asset_name: 'Lab',
+        lifecycle: ['future', 'invalid'],
+        timespan_from: '2030-01-02T13:05:00Z',
+      }),
+    ).toMatchObject({ offset: 25, limit: 25, asset_name: 'Lab', lifecycle: ['future'] });
+    expect(
+      reservationQueryParams({ ...reservationFiltersFromQuery({}), offset: 0, limit: 10 }),
+    ).toEqual({
+      offset: null,
+      limit: null,
+      asset_name: null,
+      asset_type: null,
+      timespan_from: null,
+      timespan_to: null,
+      lifecycle: null,
     });
-    expect(reservationQueryParams({ offset: 0, limit: 10 })).toEqual({ offset: null, limit: null });
   });
 });

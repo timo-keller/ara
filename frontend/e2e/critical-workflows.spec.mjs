@@ -128,6 +128,14 @@ test('My reservations exposes a responsive table with local times, lifecycle act
   await login(context, page, 'alpha-user');
   await page.goto(`${baseURL()}/reservations`);
 
+  const filters = page.getByRole('form', { name: 'Filter reservations' });
+  await expect(filters).toBeVisible();
+  await expect(filters.getByLabel('Asset name')).toBeVisible();
+  await expect(filters.getByLabel('Asset type')).toBeVisible();
+  await expect(filters.getByLabel('From')).toBeVisible();
+  await expect(filters.getByLabel('To')).toBeVisible();
+  await expect(filters.getByRole('checkbox', { name: 'current' })).not.toBeChecked();
+
   const table = page.getByRole('table');
   await expect(table).toBeVisible();
   expect(await table.getByRole('columnheader').allTextContents()).toEqual([

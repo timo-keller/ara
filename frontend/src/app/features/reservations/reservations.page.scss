@@ -2,6 +2,19 @@
   margin: var(--syn-spacing-large) 0;
 }
 
+.reservation-filters {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--syn-spacing-small);
+}
+
+.reservation-filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--syn-spacing-small);
+}
+
 .reservation-results table {
   border-collapse: collapse;
   width: 100%;

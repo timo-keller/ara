@@ -6,6 +6,50 @@
   @if (error()) {
     <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
   }
+  <form
+    class="reservation-filters"
+    (submit)="$event.preventDefault()"
+    aria-label="Filter reservations"
+  >
+    <syn-input
+      label="Asset name"
+      [value]="filters().asset_name"
+      (synChangeEvent)="updateTextFilter('asset_name', $any($event.target).value)"
+    ></syn-input>
+    <syn-input
+      label="Asset type"
+      [value]="filters().asset_type"
+      (synChangeEvent)="updateTextFilter('asset_type', $any($event.target).value)"
+    ></syn-input>
+    <syn-input
+      label="From"
+      type="datetime-local"
+      [value]="utcToLocalDateTime(filters().timespan_from)"
+      (synChangeEvent)="updateTimeFilter('timespan_from', $any($event.target).value)"
+    ></syn-input>
+    <syn-input
+      label="To"
+      type="datetime-local"
+      [value]="utcToLocalDateTime(filters().timespan_to)"
+      (synChangeEvent)="updateTimeFilter('timespan_to', $any($event.target).value)"
+    ></syn-input>
+    <fieldset>
+      <legend>Lifecycle</legend>
+      @for (lifecycle of lifecycleOptions; track lifecycle) {
+        <label
+          ><input
+            type="checkbox"
+            [checked]="filters().lifecycle.includes(lifecycle)"
+            (change)="toggleLifecycle(lifecycle, $any($event.target).checked)"
+          />
+          {{ lifecycle }}</label
+        >
+      }
+    </fieldset>
+    @if (hasFilters()) {
+      <syn-button type="button" variant="text" (click)="clearFilters()">Clear filters</syn-button>
+    }
+  </form>
   @if (state() === 'loading') {
     <div class="state" aria-live="polite">
       <syn-spinner></syn-spinner><span>Loading reservations…</span>
@@ -15,6 +59,11 @@
       >Reservations could not be loaded.
       <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
     >
+  } @else if (!reservations().length && hasFilters()) {
+    <p>
+      No reservations match the filters.
+      <button type="button" (click)="clearFilters()">Clear filters</button>
+    </p>
   } @else if (!reservations().length) {
     <p>You do not have any reservations.</p>
   } @else {
@@ -48,7 +97,7 @@
               </td>
               <td data-label="Actions and details" headers="reservation-actions">
                 <div class="actions">
-                  <syn-badge>{{ reservation.status }}</syn-badge>
+                  <syn-badge>{{ lifecycleLabel(reservation) }}</syn-badge>
                   @if (canExtend(reservation)) {
                     <syn-button type="button" (click)="openExtension(reservation)"
                       >Extend</syn-button

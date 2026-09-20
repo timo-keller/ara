@@ -12,7 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ara.api.routers import auth as auth_router
 from ara.api.routers import groups as group_router
 from ara.core.errors import DomainError
-from ara.domain.models import Asset, AuditEvent, Group, GroupRole, Reservation, User
+from ara.domain.models import (
+    Asset,
+    AuditEvent,
+    Group,
+    GroupRole,
+    Reservation,
+    ReservationStatus,
+    User,
+)
 from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
 from ara.services.authorization import EffectiveRoles
@@ -230,6 +238,126 @@ def test_own_reservation_asset_names_follow_asset_visibility(
     assert unavailable["asset_id"] == laptop
     assert unavailable["asset_name"] is None
     assert unavailable["asset_type"] is None
+
+
+def test_own_reservation_filters_are_lifecycle_and_metadata_private(
+    reservation_api_client: ApiClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, factory, user, roles = reservation_api_client
+    lab, other_laptop, _, laptop, _ = _fixtures(factory)
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(lab): GroupRole.USER}
+    )
+    now = datetime(2030, 1, 2, 10, tzinfo=UTC)
+    monkeypatch.setattr("ara.services.reservations.utc_now", lambda: now)
+
+    async def seed() -> None:
+        async with factory() as session:
+            hidden = await session.get(Asset, uuid.UUID(other_laptop))
+            assert hidden is not None
+            session.add_all(
+                [
+                    Reservation(
+                        asset_id=uuid.UUID(laptop),
+                        user_id=user.id,
+                        starts_at=now,
+                        ends_at=now + timedelta(hours=1),
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(laptop),
+                        user_id=user.id,
+                        starts_at=now + timedelta(hours=2),
+                        ends_at=now + timedelta(hours=3),
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(laptop),
+                        user_id=user.id,
+                        starts_at=now - timedelta(hours=2),
+                        ends_at=now,
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(laptop),
+                        user_id=user.id,
+                        starts_at=now,
+                        ends_at=now + timedelta(hours=1),
+                        status=ReservationStatus.RETURNED,
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(laptop),
+                        user_id=user.id,
+                        starts_at=now,
+                        ends_at=now + timedelta(hours=1),
+                        status=ReservationStatus.CANCELLED,
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(laptop),
+                        user_id=user.id,
+                        starts_at=now,
+                        ends_at=now + timedelta(hours=1),
+                        status=ReservationStatus.ENDED,
+                    ),
+                    Reservation(
+                        asset_id=hidden.id, user_id=user.id, starts_at=now, ends_at=None
+                    ),
+                ]
+            )
+            await session.commit()
+
+    asyncio.run(seed())
+    current = client.get(
+        "/api/reservations/mine", params={"lifecycle": "current"}
+    ).json()
+    assert current["total"] == 2
+    assert {item["lifecycle"] for item in current["items"]} == {"current"}
+    hidden_current = next(
+        item for item in current["items"] if item["asset_id"] == other_laptop
+    )
+    assert hidden_current["asset_name"] is None
+    assert (
+        client.get("/api/reservations/mine", params={"asset_name": "Other"}).json()[
+            "total"
+        ]
+        == 0
+    )
+    assert (
+        client.get("/api/reservations/mine", params={"asset_type": "computer"}).json()[
+            "total"
+        ]
+        == 6
+    )
+    combined = client.get(
+        "/api/reservations/mine",
+        params=[("lifecycle", "future"), ("lifecycle", "expired")],
+    ).json()
+    assert {item["lifecycle"] for item in combined["items"]} == {"future", "expired"}
+    for category in ("returned", "cancelled", "ended"):
+        terminal = client.get(
+            "/api/reservations/mine", params={"lifecycle": category}
+        ).json()
+        assert terminal["total"] == 1
+        assert terminal["items"][0]["lifecycle"] == category
+    overlap = client.get(
+        "/api/reservations/mine",
+        params={"timespan_from": now.isoformat(), "timespan_to": now.isoformat()},
+    ).json()
+    assert overlap["total"] == 6  # Ends exactly at the inclusive query boundary match.
+    assert (
+        client.get(
+            "/api/reservations/mine",
+            params={"timespan_from": "2030-01-02T11:00:00+01:00"},
+        ).status_code
+        == 400
+    )
+    assert (
+        client.get(
+            "/api/reservations/mine",
+            params={
+                "timespan_from": "2030-01-03T00:00:00Z",
+                "timespan_to": "2030-01-02T00:00:00Z",
+            },
+        ).status_code
+        == 400
+    )
 
 
 def test_reservation_lifecycle_api_routes(

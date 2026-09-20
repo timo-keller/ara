@@ -140,10 +140,42 @@ class ReservationService:
         user_id: uuid.UUID,
         offset: int,
         limit: int,
+        asset_name: str | None = None,
+        asset_type: str | None = None,
+        timespan_from: datetime | None = None,
+        timespan_to: datetime | None = None,
+        lifecycle: tuple[str, ...] = (),
     ) -> tuple[list[Reservation], int]:
         """List an actor's reservations with metadata only for visible assets."""
+        self._validate_optional_utc("timespan_from", timespan_from)
+        self._validate_optional_utc("timespan_to", timespan_to)
+        if (
+            timespan_from is not None
+            and timespan_to is not None
+            and timespan_from > timespan_to
+        ):
+            raise DomainError(
+                "reservation_invalid_timespan",
+                "timespan_from must not be after timespan_to",
+            )
+        now = utc_now()
+        group_ids = tuple(actor_roles.group_roles)
+        admin_group_ids = tuple(
+            group_id for group_id in group_ids if actor_roles.is_group_admin(group_id)
+        )
         rows, total = await self.reservations.list_for_user_with_assets(
-            user_id=user_id, offset=offset, limit=limit
+            user_id=user_id,
+            offset=offset,
+            limit=limit,
+            now=now,
+            is_owner=actor_roles.is_owner,
+            group_ids=group_ids,
+            admin_group_ids=admin_group_ids,
+            asset_name=asset_name,
+            asset_type=asset_type,
+            timespan_from=timespan_from,
+            timespan_to=timespan_to,
+            lifecycle=lifecycle,
         )
         reservations = []
         for (
@@ -173,6 +205,7 @@ class ReservationService:
             else:
                 setattr(reservation, "asset_name", None)
                 setattr(reservation, "asset_type", None)
+            setattr(reservation, "lifecycle", self._lifecycle(reservation, now))
             reservations.append(reservation)
         return reservations, total
 
@@ -396,6 +429,21 @@ class ReservationService:
             raise DomainError(
                 "reservation_timestamp_not_utc", f"{name} must be timezone-aware UTC"
             )
+
+    @classmethod
+    def _validate_optional_utc(cls, name: str, value: datetime | None) -> None:
+        if value is not None:
+            cls._validate_utc(name, value)
+
+    @staticmethod
+    def _lifecycle(reservation: Reservation, now: datetime) -> str:
+        if reservation.status is not ReservationStatus.ACTIVE:
+            return reservation.status.value
+        if reservation.starts_at > now:
+            return "future"
+        if reservation.ends_at is not None and reservation.ends_at <= now:
+            return "expired"
+        return "current"
 
     async def _reservation_with_asset(
         self, reservation_id: uuid.UUID
