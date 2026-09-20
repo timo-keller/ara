@@ -25,13 +25,18 @@
         <syn-option [value]="group.id">{{ group.name }}</syn-option>
       }
     </syn-select>
-    <syn-input
+    <syn-combobox
       label="Type"
+      clearable
+      restricted
       [value]="filters().assetType"
-      (valueChange)="changeFilter('assetType', $event)"
+      (valueChange)="changeAssetType($event)"
     >
-      <span slot="help-text"><strong>Optional</strong>. Enter the exact asset type.</span>
-    </syn-input>
+      <span slot="help-text"><strong>Optional</strong>. Select an asset type.</span>
+      @for (type of assetTypes(); track type) {
+        <syn-option [value]="type">{{ type }}</syn-option>
+      }
+    </syn-combobox>
     <syn-select
       label="Availability"
       [value]="filters().availability"

@@ -1,8 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { AssetCataloguePage } from './asset-catalogue.page';
+import { provideRouter, Router } from '@angular/router';
+import {
+  AssetCataloguePage,
+  assetFiltersFromQuery,
+  assetQueryParams,
+} from './asset-catalogue.page';
 
 describe('AssetCataloguePage', () => {
   let http: HttpTestingController;
@@ -16,8 +20,10 @@ describe('AssetCataloguePage', () => {
 
   afterEach(() => http.verify());
 
-  it('keeps archived data out of the rendered catalogue and maps page changes', () => {
+  it('offers only active authorized result types, accepts selections, and clears them', () => {
     const fixture = TestBed.createComponent(AssetCataloguePage);
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     fixture.detectChanges();
     http.expectOne('/api/groups?archived=false&limit=100').flush({ items: [] });
     http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
@@ -36,7 +42,7 @@ describe('AssetCataloguePage', () => {
         {
           id: 'archived',
           name: 'Archived asset',
-          asset_type: 'device',
+          asset_type: 'archived-only',
           description: null,
           archived_at: '2026-01-01',
           availability: 'reserved',
@@ -47,11 +53,52 @@ describe('AssetCataloguePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Active asset');
     expect(fixture.nativeElement.textContent).toContain('Available now');
     expect(fixture.nativeElement.textContent).not.toContain('Archived asset');
+    const typeFilter = fixture.nativeElement.querySelector('syn-combobox');
+    expect(typeFilter.hasAttribute('restricted')).toBe(true);
+    expect(typeFilter.hasAttribute('clearable')).toBe(true);
+    expect(typeFilter.textContent).toContain('device');
+    expect(typeFilter.textContent).not.toContain('archived-only');
 
-    fixture.componentInstance.changePage(new CustomEvent('page', { detail: { currentPage: 2 } }));
-    const page = http.expectOne('/api/assets?offset=10&limit=10&archived=false');
-    expect(page.request.method).toBe('GET');
-    page.flush({ items: [], total: 0, offset: 10, limit: 10 });
+    fixture.componentInstance.changeAssetType('device');
+    expect(navigate).toHaveBeenLastCalledWith([], {
+      relativeTo: expect.anything(),
+      queryParams: assetQueryParams({
+        ...fixture.componentInstance.filters(),
+        assetType: 'device',
+        offset: 0,
+      }),
+    });
+    fixture.componentInstance.changeAssetType('not-an-option');
+    expect(navigate).toHaveBeenCalledTimes(1);
+    fixture.componentInstance.changeAssetType('');
+    expect(navigate).toHaveBeenCalledTimes(2);
+  });
+
+  it('restores legacy asset_type links and serializes page resets in the URL', () => {
+    const filters = assetFiltersFromQuery({
+      group_id: 'group-1',
+      asset_type: 'laptop',
+      availability: 'available',
+      text: 'linux',
+      offset: '20',
+      limit: '25',
+    });
+    expect(filters).toEqual({
+      groupId: 'group-1',
+      assetType: 'laptop',
+      availability: 'available',
+      text: 'linux',
+      offset: 20,
+      limit: 25,
+    });
+    expect(assetQueryParams({ ...filters, assetType: '', offset: 0 })).toEqual({
+      group_id: 'group-1',
+      asset_type: null,
+      availability: 'available',
+      text: 'linux',
+      offset: null,
+      limit: 25,
+    });
   });
 
   it('renders an understandable loading state', () => {
