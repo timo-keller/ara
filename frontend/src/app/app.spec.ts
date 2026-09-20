@@ -56,6 +56,14 @@ describe('App', () => {
     const rail = fixture.nativeElement.querySelector('syn-side-nav');
     expect(rail?.getAttribute('variant')).toBe('rail');
     expect(connectSideNavigation).toHaveBeenCalledWith(rail);
+    const accountNavigation = fixture.nativeElement.querySelector(
+      'nav[aria-label="Account"]',
+    ) as HTMLElement;
+    expect(Array.from(accountNavigation.children).map((child) => child.tagName)).toEqual([
+      'SPAN',
+      'APP-SETTINGS',
+    ]);
+    expect(accountNavigation.querySelector('.account-name')?.textContent?.trim()).toBe('Ada');
     expect(fixture.nativeElement.textContent).toContain('Effective roles: Owner');
     expect(fixture.nativeElement.textContent).toContain('Administration');
     expect(fixture.nativeElement.textContent).toContain('Audit history');

@@ -36,7 +36,14 @@
   max-width: 36rem;
 }
 
-.account-name,
+.account-name {
+  align-items: center;
+  align-self: center;
+  display: inline-flex;
+  font: var(--syn-body-small);
+  line-height: var(--syn-line-height-normal);
+}
+
 .effective-roles {
   font: var(--syn-body-small);
 }
