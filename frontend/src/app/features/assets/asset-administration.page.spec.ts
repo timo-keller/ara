@@ -218,6 +218,7 @@ describe('AssetAdministrationPage', () => {
     ) as HTMLElement;
     expect(typeFilter).not.toBeNull();
     expect(typeFilter.hasAttribute('clearable')).toBe(true);
+    expect(typeFilter.hasAttribute('help-text')).toBe(false);
     expect(typeFilter.textContent).not.toContain('Camera');
     expect(typeFilter.textContent).not.toContain('Server');
   });

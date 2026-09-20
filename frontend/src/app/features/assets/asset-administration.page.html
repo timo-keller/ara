@@ -1,4 +1,4 @@
-<section aria-labelledby="asset-administration-heading">
+<section class="asset-administration-page" aria-labelledby="asset-administration-heading">
   <h1 id="asset-administration-heading">Asset administration</h1>
   <p>
     Manage assets in your authorized groups. Remote-access details are descriptive only; never enter
@@ -24,7 +24,6 @@
         <syn-select
           label="Filter by asset type"
           clearable
-          help-text="Choose from types used by assets you may manage, including archived assets. Clear to show every type."
           [value]="assetTypeFilter()"
           (valueChange)="changeAssetTypeFilter($event)"
         >

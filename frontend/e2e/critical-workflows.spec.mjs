@@ -154,9 +154,26 @@ test('asset administration provides a keyboard-selectable responsive master-deta
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
   await login(context, page, 'alpha-admin');
+
+  const manageableAssets = await csrfFetch(page, '/api/assets?archived=false&limit=100');
+  const groupId = manageableAssets.body.items[0].group_id;
+  for (let index = 0; index < 20; index += 1) {
+    const response = await csrfFetch(page, '/api/assets', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        group_id: groupId,
+        name: `Scrollable asset ${index}`,
+        asset_type: 'laptop',
+      }),
+    });
+    expect(response.status).toBe(201);
+  }
   await page.goto(`${baseURL()}/asset-administration`);
 
   const workspace = page.locator('.asset-workspace');
+  const listPane = page.locator('.asset-list-pane');
+  const editorPane = page.locator('.asset-editor');
   const asset = page.getByRole('button', { name: 'Edit Alpha Laptop' });
   expect(
     await workspace.evaluate(
@@ -170,6 +187,25 @@ test('asset administration provides a keyboard-selectable responsive master-deta
     'aria-current',
     'true',
   );
+  await expect(page.getByRole('combobox', { name: 'Filter by asset type' })).toBeVisible();
+  await expect(page.locator('syn-select[label="Filter by asset type"]')).not.toHaveAttribute(
+    'help-text',
+    /.+/,
+  );
+  await expect(listPane).toHaveCSS('overflow-y', 'auto');
+  await expect(editorPane).toHaveCSS('overflow-y', 'auto');
+  expect(await listPane.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  expect(await editorPane.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+
+  await listPane.evaluate((node) => (node.scrollTop = 100));
+  const listScrollBeforeEditorScroll = await listPane.evaluate((node) => node.scrollTop);
+  await editorPane.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  expect(await editorPane.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  expect(await listPane.evaluate((node) => node.scrollTop)).toBe(listScrollBeforeEditorScroll);
+  const editorScrollBeforeListScroll = await editorPane.evaluate((node) => node.scrollTop);
+  await listPane.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  expect(await listPane.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  expect(await editorPane.evaluate((node) => node.scrollTop)).toBe(editorScrollBeforeListScroll);
 
   await setSynInput(page, 'Filter assets by name', 'return');
   await expect(page.getByRole('button', { name: 'Edit Alpha Laptop' })).toHaveCount(0);
@@ -188,6 +224,11 @@ test('asset administration provides a keyboard-selectable responsive master-deta
       (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length,
     ),
   ).toBe(1);
+  await expect(listPane).toHaveCSS('overflow-y', 'visible');
+  await expect(editorPane).toHaveCSS('overflow-y', 'visible');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
+  ).toBe(true);
   await expect(page.getByRole('heading', { name: 'Managed assets' })).toBeVisible();
   await expect(
     page.locator('.list-heading').getByRole('button', { name: 'Create asset', exact: true }),

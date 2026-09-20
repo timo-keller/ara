@@ -28,7 +28,9 @@
 }
 
 .appshell-main {
-  flex: 1 0 auto;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .authentication-state {

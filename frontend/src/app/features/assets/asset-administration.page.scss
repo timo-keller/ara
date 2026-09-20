@@ -1,6 +1,11 @@
 syn-card {
   display: block;
 }
+
+.asset-administration-page {
+  min-width: 0;
+}
+
 .asset-workspace {
   align-items: start;
   display: grid;
@@ -74,10 +79,37 @@ form {
   margin: 0 0 0.75rem;
 }
 
+@media (min-width: 48.0625rem) {
+  .asset-administration-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .asset-workspace {
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .asset-list-pane,
+  .asset-editor {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 48rem) {
   .asset-workspace {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .asset-list-pane,
+  .asset-editor {
+    overflow-y: visible;
+  }
+
   .asset-filters {
     grid-template-columns: minmax(0, 1fr);
   }
