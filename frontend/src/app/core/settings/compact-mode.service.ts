@@ -11,7 +11,7 @@ const COMPACT_SIZED_SELECTOR = [
   'syn-switch',
   'syn-textarea',
 ]
-  .map((selector) => `${selector}:not([size]):not([data-compact-mode-exempt])`)
+  .map((selector) => `${selector}:not([data-compact-mode-exempt])`)
   .join(', ');
 
 @Injectable({ providedIn: 'root' })
@@ -25,6 +25,7 @@ export class CompactModeService {
     } catch {
       // Storage can be unavailable (for example, in a private browsing context).
     }
+    this.apply();
   }
 
   apply(): void {
@@ -33,6 +34,9 @@ export class CompactModeService {
 
     if (this.compact()) {
       shell.querySelectorAll<HTMLElement>(COMPACT_SIZED_SELECTOR).forEach((element) => {
+        if (!('compactModeSized' in element.dataset)) {
+          element.dataset['compactModeOriginalSize'] = element.getAttribute('size') ?? '';
+        }
         element.setAttribute('size', 'small');
         element.dataset['compactModeSized'] = '';
       });
@@ -40,8 +44,11 @@ export class CompactModeService {
     }
 
     shell.querySelectorAll<HTMLElement>('[data-compact-mode-sized]').forEach((element) => {
-      element.removeAttribute('size');
+      const originalSize = element.dataset['compactModeOriginalSize'];
+      if (originalSize) element.setAttribute('size', originalSize);
+      else element.removeAttribute('size');
       delete element.dataset['compactModeSized'];
+      delete element.dataset['compactModeOriginalSize'];
     });
   }
 

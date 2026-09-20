@@ -124,6 +124,11 @@ test('settings menu exposes notifications and preserves compact mode', async ({
 
   await page.locator('syn-switch').locator('[part="control"]').click();
   await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
+  await expect(page.locator('syn-switch')).toHaveAttribute('size', 'small');
+  await expect(settings).not.toHaveAttribute('size');
+  await page.goto(`${baseURL()}/assets`);
+  await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
+  await expect(page.locator('syn-input[label="Search assets"]')).toHaveAttribute('size', 'small');
   await page.reload();
   await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
   await expect(settings).not.toHaveAttribute('size');

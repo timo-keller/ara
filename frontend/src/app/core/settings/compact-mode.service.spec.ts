@@ -13,29 +13,39 @@ describe('CompactModeService', () => {
     expect(new CompactModeService().compact()).toBe(true);
   });
 
-  it('keeps the Settings trigger normal while sizing other supported controls in compact mode', () => {
+  it('immediately sizes controls and restores their original documented size while keeping Settings normal', () => {
     document.body.innerHTML =
-      '<div class="appshell"><syn-button data-compact-mode-exempt></syn-button><syn-button></syn-button><syn-input></syn-input></div>';
+      '<div class="appshell"><syn-button data-compact-mode-exempt></syn-button><syn-button size="medium"></syn-button><syn-input></syn-input></div>';
     const service = new CompactModeService();
     const [settings, button] = document.querySelectorAll('syn-button');
     const input = document.querySelector('syn-input');
 
-    service.apply();
     expect(settings?.hasAttribute('size')).toBe(false);
-    expect(button?.hasAttribute('size')).toBe(false);
+    expect(button?.getAttribute('size')).toBe('medium');
     expect(input?.hasAttribute('size')).toBe(false);
 
     service.setCompact(true);
-    service.apply();
     expect(settings?.hasAttribute('size')).toBe(false);
     expect(button?.getAttribute('size')).toBe('small');
     expect(input?.getAttribute('size')).toBe('small');
     expect(localStorage.getItem('ara.compact-mode')).toBe('true');
 
     service.setCompact(false);
-    service.apply();
     expect(settings?.hasAttribute('size')).toBe(false);
-    expect(button?.hasAttribute('size')).toBe(false);
+    expect(button?.getAttribute('size')).toBe('medium');
     expect(input?.hasAttribute('size')).toBe(false);
+  });
+
+  it('applies a saved preference and sizes controls rendered after compact mode is enabled', () => {
+    localStorage.setItem('ara.compact-mode', 'true');
+    document.body.innerHTML = '<div class="appshell"><syn-button></syn-button></div>';
+    const service = new CompactModeService();
+
+    service.apply();
+    expect(document.querySelector('syn-button')?.getAttribute('size')).toBe('small');
+
+    document.querySelector('.appshell')?.insertAdjacentHTML('beforeend', '<syn-input></syn-input>');
+    service.apply();
+    expect(document.querySelector('syn-input')?.getAttribute('size')).toBe('small');
   });
 });
