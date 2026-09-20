@@ -4,7 +4,7 @@
     <p>Checking your session…</p>
   </main>
 } @else if (auth.state() === 'authenticated') {
-  <div class="appshell">
+  <div class="appshell" [class.appshell--administration]="isCurrent('/administration')">
     <syn-header label="ARA">
       <nav slot="meta-navigation" aria-label="Account">
         <app-settings />

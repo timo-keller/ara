@@ -90,3 +90,22 @@
     --side-nav-open-width: 306px;
   }
 }
+
+/* Group administration uses document flow for its stacked layout through 48rem. */
+@media (min-width: 641px) and (max-width: 48rem) {
+  .appshell--administration {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .appshell--administration .appshell-content,
+  .appshell-content-inner--administration {
+    overflow: visible;
+  }
+
+  .appshell-main--administration {
+    display: block;
+    min-height: auto;
+  }
+}

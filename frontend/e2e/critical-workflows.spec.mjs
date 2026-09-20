@@ -382,6 +382,22 @@ test('Administration content scrolls within its fixed desktop surface without mo
       }),
     });
     expect(mapping.status).toBe(201);
+    if (index === 19) {
+      for (let mappingIndex = 0; mappingIndex < 10; mappingIndex += 1) {
+        const extraMapping = await csrfFetch(page, '/api/role-mappings', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            group_id: response.body.id,
+            expression: `contains(groups, 'scrollable-${mappingIndex}')`,
+            role: 'user',
+            priority: index + mappingIndex + 1,
+            enabled: true,
+          }),
+        });
+        expect(extraMapping.status).toBe(201);
+      }
+    }
   }
 
   await page.goto(`${baseURL()}/administration`);
@@ -411,9 +427,13 @@ test('Administration content scrolls within its fixed desktop surface without mo
   await expect(
     page.getByRole('button', { name: 'Edit Tall administration group 19, selected', exact: true }),
   ).toHaveAttribute('aria-current', 'true');
+  expect(await groupEditor.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
   await page.getByRole('button', { name: 'Create group', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create group' }).last()).toBeVisible();
   await expect(page.locator('.group-list-item[aria-current="true"]')).toHaveCount(0);
+
+  await selectedGroup.focus();
+  await selectedGroup.press('Enter');
 
   const shell = page.locator('.appshell');
   const content = page.locator('.appshell-content-inner');
@@ -423,10 +443,26 @@ test('Administration content scrolls within its fixed desktop surface without mo
   const logout = page.locator('syn-side-nav > syn-nav-item[slot="footer"]');
   await expect(main).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(content).toHaveCSS('overflow-y', 'hidden');
-  await expect(administrationContent).toHaveCSS('overflow-y', 'auto');
+  await expect(administrationContent).toHaveCSS('overflow-y', 'hidden');
+  expect(await main.evaluate((node) => node.scrollHeight <= node.clientHeight)).toBe(true);
   expect(
-    await administrationContent.evaluate((node) => node.scrollHeight > node.clientHeight),
+    await administrationContent.evaluate((node) => node.scrollHeight <= node.clientHeight),
   ).toBe(true);
+  const paneBounds = await page.evaluate(() => {
+    const mainBox = document.querySelector('.appshell-main').getBoundingClientRect();
+    const workspaceBox = document.querySelector('.group-workspace').getBoundingClientRect();
+    const editorBox = document.querySelector('.group-editor').getBoundingClientRect();
+    const mainPaddingBottom = Number.parseFloat(
+      getComputedStyle(document.querySelector('.appshell-main')).paddingBottom,
+    );
+    return {
+      editorBottom: editorBox.bottom,
+      workspaceBottom: workspaceBox.bottom,
+      expectedBottom: mainBox.bottom - mainPaddingBottom,
+    };
+  });
+  expect(paneBounds.editorBottom).toBeCloseTo(paneBounds.workspaceBottom, 1);
+  expect(paneBounds.workspaceBottom).toBeCloseTo(paneBounds.expectedBottom, 1);
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
   ).toBe(true);
@@ -438,8 +474,11 @@ test('Administration content scrolls within its fixed desktop surface without mo
   expect(logoutBox.y + logoutBox.height).toBeLessThanOrEqual(720);
 
   const mainBeforeScroll = await main.boundingBox();
-  await administrationContent.evaluate((node) => (node.scrollTop = node.scrollHeight));
-  expect(await administrationContent.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await groupList.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  const listScrollBeforeEditorScroll = await groupList.evaluate((node) => node.scrollTop);
+  await groupEditor.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  expect(await groupEditor.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  expect(await groupList.evaluate((node) => node.scrollTop)).toBe(listScrollBeforeEditorScroll);
   expect(await main.boundingBox()).toEqual(mainBeforeScroll);
   const railAfterScroll = await rail.boundingBox();
   expect(railAfterScroll).not.toBeNull();
@@ -457,6 +496,63 @@ test('Administration content scrolls within its fixed desktop surface without mo
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
   ).toBe(true);
+  await context.close();
+});
+
+test('group role mappings follow the keyboard-selected group context', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'e2e-owner');
+  const first = await csrfFetch(page, '/api/groups', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Scoped mappings Alpha' }),
+  });
+  const second = await csrfFetch(page, '/api/groups', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Scoped mappings Bravo' }),
+  });
+  for (const [groupId, expression] of [
+    [first.body.id, "contains(groups, 'scoped-alpha')"],
+    [second.body.id, "contains(groups, 'scoped-bravo')"],
+  ]) {
+    const mapping = await csrfFetch(page, '/api/role-mappings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        group_id: groupId,
+        expression,
+        role: 'user',
+        priority: 0,
+        enabled: true,
+      }),
+    });
+    expect(mapping.status).toBe(201);
+  }
+  await page.goto(`${baseURL()}/administration`);
+  const alpha = page.getByRole('button', { name: 'Edit Scoped mappings Alpha', exact: true });
+  await alpha.focus();
+  await alpha.press('Enter');
+  await expect(
+    page.getByRole('heading', { name: 'Role mappings for Scoped mappings Alpha' }),
+  ).toBeVisible();
+  await expect(page.locator('.mapping-list')).toContainText('scoped-alpha');
+  await expect(page.locator('.mapping-list')).not.toContainText('scoped-bravo');
+  await setSynInput(page, 'JMESPath expression', 'draft retained');
+  await page.getByRole('button', { name: 'Create group', exact: true }).click();
+  await expect(
+    page.getByText('Save and select a group before managing its role mappings.'),
+  ).toBeVisible();
+  await expect(page.getByLabel('JMESPath expression')).toHaveCount(0);
+  const bravo = page.getByRole('button', { name: 'Edit Scoped mappings Bravo', exact: true });
+  await bravo.focus();
+  await bravo.press('Enter');
+  await expect(page.locator('.mapping-list')).toContainText('scoped-bravo');
+  await expect(page.locator('.mapping-list')).not.toContainText('scoped-alpha');
+  await alpha.focus();
+  await alpha.press('Enter');
+  await expect(page.getByLabel('JMESPath expression')).toHaveValue('draft retained');
   await context.close();
 });
 

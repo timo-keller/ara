@@ -69,7 +69,9 @@ syn-card,
 }
 
 .role-mappings {
-  margin-bottom: var(--syn-spacing-large);
+  border-top: 1px solid var(--syn-color-neutral-300);
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
 }
 
 .mapping-list {
@@ -107,12 +109,18 @@ form {
   padding: 1rem 0;
 }
 
-.mapping-group + .mapping-group {
-  margin-top: 1.5rem;
-}
-
 .empty-mappings {
   margin: 1rem 0;
+}
+
+.mapping-context {
+  font-weight: 600;
+}
+
+.group-list-item strong,
+.mapping-context,
+code {
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 48.0625rem) {
@@ -124,14 +132,22 @@ form {
   }
 
   .administration-content {
+    display: flex;
     flex: 1 1 auto;
+    flex-direction: column;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
+  }
+
+  .administration-content > :not(.group-workspace) {
+    flex: 0 0 auto;
   }
 
   .group-workspace {
     align-items: stretch;
-    height: min(34rem, calc(100dvh - 12rem));
+    flex: 1 1 auto;
+    margin-bottom: 0;
+    min-height: 0;
   }
 
   .group-list-pane,
