@@ -193,7 +193,7 @@ test('authenticated route introductions use the compact heading-to-content rhyth
 
   await page.goto(`${baseURL()}/administration`);
   await expect(page.getByRole('heading', { name: 'Group administration' })).toBeVisible();
-  await expectCompactRouteGap(page, page.locator('.admin-grid'));
+  await expectCompactRouteGap(page, page.locator('.group-workspace'));
   await context.close();
 });
 
@@ -387,8 +387,33 @@ test('Administration content scrolls within its fixed desktop surface without mo
   await page.goto(`${baseURL()}/administration`);
   await expect(page.getByRole('heading', { name: 'Group administration' })).toBeVisible();
   await expect(
-    page.locator('.list-item strong').filter({ hasText: 'Tall administration group 19' }),
+    page.locator('.group-list-item strong').filter({ hasText: 'Tall administration group 19' }),
   ).toBeVisible();
+
+  const workspace = page.locator('.group-workspace');
+  const groupList = page.locator('.group-list-pane');
+  const groupEditor = page.locator('.group-editor');
+  expect(
+    await workspace.evaluate(
+      (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(2);
+  await expect(groupList).toHaveCSS('overflow-y', 'auto');
+  await expect(groupEditor).toHaveCSS('overflow-y', 'auto');
+  expect(await groupList.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  const selectedGroup = page.getByRole('button', {
+    name: 'Edit Tall administration group 19',
+    exact: true,
+  });
+  await selectedGroup.focus();
+  await selectedGroup.press('Enter');
+  await expect(page.getByText('Editing Tall administration group 19')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Edit Tall administration group 19, selected', exact: true }),
+  ).toHaveAttribute('aria-current', 'true');
+  await page.getByRole('button', { name: 'Create group', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Create group' }).last()).toBeVisible();
+  await expect(page.locator('.group-list-item[aria-current="true"]')).toHaveCount(0);
 
   const shell = page.locator('.appshell');
   const content = page.locator('.appshell-content-inner');
@@ -422,6 +447,13 @@ test('Administration content scrolls within its fixed desktop surface without mo
 
   await page.setViewportSize({ width: 640, height: 720 });
   await expect(administrationContent).toHaveCSS('overflow-y', 'visible');
+  expect(
+    await workspace.evaluate(
+      (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length,
+    ),
+  ).toBe(1);
+  await expect(groupList).toHaveCSS('overflow-y', 'visible');
+  await expect(groupEditor).toHaveCSS('overflow-y', 'visible');
   expect(
     await shell.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
   ).toBe(true);
@@ -502,7 +534,7 @@ test('Audit history keeps its desktop surface fixed while event cards scroll', a
   await expect(page.locator('syn-pagination[aria-label="Audit history pages"]')).toBeVisible();
 
   await page.goto(`${baseURL()}/administration`);
-  const administrationCardTitle = page.locator('.admin-grid syn-card > h2[slot="header"]').first();
+  const administrationCardTitle = page.locator('.group-editor > h2[slot="header"]');
   await expect(administrationCardTitle).toBeVisible();
   expect(
     await administrationCardTitle.evaluate((node) =>

@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
+import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
 import { SynCardComponent } from '@synergy-design-system/angular/components/card';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
@@ -35,9 +36,12 @@ interface MappingGroup {
   mappings: RoleMapping[];
 }
 
+const emptyGroupDraft = (): GroupDraft => ({ id: null, name: '', description: '' });
+
 @Component({
   imports: [
     SynAlertComponent,
+    SynBadgeComponent,
     SynButtonComponent,
     SynCardComponent,
     SynInputComponent,
@@ -53,6 +57,12 @@ interface MappingGroup {
 export class AdministrationPage {
   private readonly administration = inject(AdministrationService);
   readonly groups = signal<Group[]>([]);
+  readonly orderedGroups = computed(() =>
+    [...this.groups()].sort((left, right) => this.compareByNameAndId(left, right)),
+  );
+  readonly selectedGroup = computed(
+    () => this.groups().find((group) => group.id === this.groupDraft().id) ?? null,
+  );
   readonly mappings = signal<RoleMapping[]>([]);
   readonly mappingGroups = computed<MappingGroup[]>(() => {
     const mappingsByGroup = new Map<string, RoleMapping[]>();
@@ -77,7 +87,7 @@ export class AdministrationPage {
   readonly error = signal<string | null>(null);
   readonly archiveConflicts = signal<ApiErrorDetail[]>([]);
   readonly testResult = signal<boolean | null>(null);
-  readonly groupDraft = signal<GroupDraft>({ id: null, name: '', description: '' });
+  readonly groupDraft = signal<GroupDraft>(emptyGroupDraft());
   readonly mappingDraft = signal<MappingDraft>({
     id: null,
     group_id: '',
@@ -90,7 +100,7 @@ export class AdministrationPage {
     this.load();
   }
 
-  load(): void {
+  load(selectedGroupId: string | null = this.groupDraft().id): void {
     this.state.set('loading');
     this.error.set(null);
     this.administration.groups().subscribe({
@@ -99,6 +109,11 @@ export class AdministrationPage {
         this.administration.mappings().subscribe({
           next: ({ items: mappings }) => {
             this.mappings.set(mappings);
+            if (selectedGroupId) {
+              const selected = items.find((group) => group.id === selectedGroupId);
+              if (selected) this.editGroup(selected);
+              else this.createGroup();
+            }
             this.state.set('ready');
           },
           error: (error) => this.loadError(error),
@@ -116,6 +131,12 @@ export class AdministrationPage {
     this.groupDraft.set({ id: group.id, name: group.name, description: group.description ?? '' });
   }
 
+  createGroup(): void {
+    this.error.set(null);
+    this.archiveConflicts.set([]);
+    this.groupDraft.set(emptyGroupDraft());
+  }
+
   saveGroup(): void {
     const draft = this.groupDraft();
     if (!draft.name.trim()) return this.showError('A group name is required.');
@@ -124,7 +145,7 @@ export class AdministrationPage {
       ? this.administration.updateGroup(draft.id, payload)
       : this.administration.createGroup(payload);
     request.subscribe({
-      next: () => this.resetGroupAndLoad(),
+      next: (group) => this.load(group.id),
       error: (error) => this.showApiError(error),
     });
   }
@@ -132,7 +153,7 @@ export class AdministrationPage {
   archiveGroup(group: Group): void {
     this.archiveConflicts.set([]);
     this.administration.archiveGroup(group.id).subscribe({
-      next: () => this.load(),
+      next: () => this.load(group.id),
       error: (error) => {
         const details = this.apiError(error)?.error?.details ?? [];
         if (this.apiError(error)?.error?.code === 'group_has_unresolved_reservations') {
@@ -146,7 +167,7 @@ export class AdministrationPage {
   reactivateGroup(group: Group): void {
     this.administration
       .reactivateGroup(group.id)
-      .subscribe({ next: () => this.load(), error: (e) => this.showApiError(e) });
+      .subscribe({ next: () => this.load(group.id), error: (e) => this.showApiError(e) });
   }
 
   changeMapping(
@@ -203,11 +224,6 @@ export class AdministrationPage {
       next: ({ matches }) => this.testResult.set(matches),
       error: (error) => this.showApiError(error),
     });
-  }
-
-  private resetGroupAndLoad(): void {
-    this.groupDraft.set({ id: null, name: '', description: '' });
-    this.load();
   }
 
   private resetMappingAndLoad(): void {

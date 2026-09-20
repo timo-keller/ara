@@ -134,6 +134,57 @@ describe('AdministrationPage', () => {
     expect(fixture.nativeElement.textContent).toContain('matches your current sign-in claims');
   });
 
+  it('selects active and archived groups, resets to create mode, and preserves mapping drafts', () => {
+    const archived = {
+      id: 'group-2',
+      name: 'Archived lab',
+      description: null,
+      archived_at: '2026-01-01T00:00:00Z',
+    };
+    const fixture = createReadyPage([group, archived]);
+    const page = fixture.componentInstance;
+    const listItems = fixture.nativeElement.querySelectorAll(
+      '.group-list-item',
+    ) as NodeListOf<HTMLElement>;
+    const archivedItem = Array.from(listItems).find((item) =>
+      item.textContent?.includes(archived.name),
+    ) as HTMLElement;
+
+    expect(fixture.nativeElement.textContent).toContain('Active');
+    expect(fixture.nativeElement.textContent).toContain('Archived');
+    archivedItem.dispatchEvent(new Event('click'));
+    fixture.detectChanges();
+    expect(page.groupDraft()).toEqual({ id: archived.id, name: archived.name, description: '' });
+    expect(archivedItem.getAttribute('aria-current')).toBe('true');
+    expect(archivedItem.getAttribute('aria-label')).toBe('Edit Archived lab, selected');
+
+    page.changeMapping('expression', 'contains(groups, `lab`)');
+    page.createGroup();
+    expect(page.groupDraft()).toEqual({ id: null, name: '', description: '' });
+    expect(page.mappingDraft().expression).toBe('contains(groups, `lab`)');
+  });
+
+  it('retains the selected group after group mutations and returns to create mode when it disappears', () => {
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.editGroup(group);
+    page.changeGroup('name', 'Renamed lab');
+    page.saveGroup();
+    const update = http.expectOne('/api/groups/group-1');
+    expect(update.request.method).toBe('PATCH');
+    update.flush({ ...group, name: 'Renamed lab' });
+    http.expectOne('/api/groups?limit=100').flush({ items: [{ ...group, name: 'Renamed lab' }] });
+    http.expectOne('/api/role-mappings?archived=false&limit=100').flush({ items: [] });
+    expect(page.groupDraft().id).toBe(group.id);
+    expect(page.groupDraft().name).toBe('Renamed lab');
+
+    page.archiveGroup({ ...group, name: 'Renamed lab' });
+    http.expectOne('/api/groups/group-1/archive').flush({});
+    http.expectOne('/api/groups?limit=100').flush({ items: [] });
+    http.expectOne('/api/role-mappings?archived=false&limit=100').flush({ items: [] });
+    expect(page.groupDraft()).toEqual({ id: null, name: '', description: '' });
+  });
+
   it('explains priority and retains non-negative whole-number validation', () => {
     const fixture = createReadyPage();
     const page = fixture.componentInstance;
