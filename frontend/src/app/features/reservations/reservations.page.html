@@ -162,7 +162,11 @@
   >
     <p>
       @if (pendingAction()?.action === 'return') {
-        Returning makes this asset available immediately.
+        @if (pendingAction()?.reservation?.lifecycle === 'expired') {
+          Returning records this elapsed reservation as returned.
+        } @else {
+          Returning makes this asset available immediately.
+        }
       } @else {
         Cancelling removes your future reservation and makes that time available to others.
       }

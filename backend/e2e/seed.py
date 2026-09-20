@@ -73,6 +73,12 @@ async def seed(database_url: str, issuer: str) -> None:
                     name="Alpha Return Laptop",
                     asset_type="laptop",
                 ),
+                Asset(
+                    id=uuid.UUID("50000000-0000-0000-0000-000000000005"),
+                    group=alpha,
+                    name="Alpha Expired Laptop",
+                    asset_type="laptop",
+                ),
                 reserved_asset,
                 Asset(group=bravo, name="Bravo Laptop", asset_type="laptop"),
                 User(
@@ -87,16 +93,30 @@ async def seed(database_url: str, issuer: str) -> None:
         return_asset = await session.get(
             Asset, uuid.UUID("30000000-0000-0000-0000-000000000003")
         )
+        expired_asset = await session.get(
+            Asset, uuid.UUID("50000000-0000-0000-0000-000000000005")
+        )
         alpha_user = await session.scalar(
             select(User).where(User.oidc_subject == "alpha-user")
         )
-        assert return_asset is not None and alpha_user is not None
+        assert (
+            return_asset is not None
+            and expired_asset is not None
+            and alpha_user is not None
+        )
         session.add_all(
             [
                 Reservation(
                     asset_id=return_asset.id,
                     user_id=alpha_user.id,
                     starts_at=utc_now() - timedelta(hours=1),
+                    status=ReservationStatus.ACTIVE,
+                ),
+                Reservation(
+                    asset_id=expired_asset.id,
+                    user_id=alpha_user.id,
+                    starts_at=utc_now() - timedelta(hours=2),
+                    ends_at=utc_now() - timedelta(hours=1),
                     status=ReservationStatus.ACTIVE,
                 ),
                 Reservation(

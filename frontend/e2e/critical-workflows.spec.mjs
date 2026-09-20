@@ -136,9 +136,6 @@ test('My reservations exposes keyboard lifecycle filtering, history restoration,
   await expect(filters.getByLabel('To')).toBeVisible();
   const lifecycle = filters.getByRole('combobox', { name: 'Lifecycle' });
   await expect(lifecycle).toBeVisible();
-  await expect(filters.getByText('No lifecycle selected', { exact: true })).toBeVisible();
-  await expect(filters.getByRole('button', { name: 'Select all lifecycles' })).toBeEnabled();
-  await expect(filters.getByRole('button', { name: 'Clear lifecycle' })).toBeDisabled();
 
   await lifecycle.focus();
   await lifecycle.press('ArrowDown');
@@ -147,21 +144,18 @@ test('My reservations exposes keyboard lifecycle filtering, history restoration,
   await lifecycle.press('Enter');
   await lifecycle.press('Escape');
   await expect(lifecycle).toBeFocused();
-  await expect(filters.getByText('2 of 6 lifecycles selected', { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/lifecycle=current.*lifecycle=future/);
+  await expect(filters.locator('syn-tag').filter({ hasText: 'Current' })).toBeVisible();
+  await expect(filters.locator('syn-tag').filter({ hasText: 'Future' })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Remove' })).toHaveCount(2);
 
-  await filters.getByRole('button', { name: 'Select all lifecycles' }).focus();
-  await filters.getByRole('button', { name: 'Select all lifecycles' }).press('Enter');
-  await expect(filters.getByText('All lifecycles', { exact: true })).toBeVisible();
-  await expect(filters.getByRole('button', { name: 'Select all lifecycles' })).toBeDisabled();
-  await filters.getByRole('button', { name: 'Clear lifecycle' }).focus();
-  await filters.getByRole('button', { name: 'Clear lifecycle' }).press('Enter');
-  await expect(filters.getByText('No lifecycle selected', { exact: true })).toBeVisible();
-  await expect(filters.getByRole('button', { name: 'Clear lifecycle' })).toBeDisabled();
+  await filters.getByRole('button', { name: 'Clear entry' }).click();
+  await expect(filters.getByRole('button', { name: 'Remove' })).toHaveCount(0);
   await page.goBack();
-  await expect(filters.getByText('All lifecycles', { exact: true })).toBeVisible();
+  await expect(filters.locator('syn-tag').filter({ hasText: 'Current' })).toBeVisible();
+  await expect(filters.locator('syn-tag').filter({ hasText: 'Future' })).toBeVisible();
   await page.goForward();
-  await expect(filters.getByText('No lifecycle selected', { exact: true })).toBeVisible();
+  await expect(filters.getByRole('button', { name: 'Remove' })).toHaveCount(0);
   expect(await filters.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
 
   const table = page.getByRole('table');
@@ -177,8 +171,16 @@ test('My reservations exposes keyboard lifecycle filtering, history restoration,
     table.getByRole('link', { name: 'View details for Alpha Return Laptop' }),
   ).toBeVisible();
   await expect(table.getByText('until returned')).toBeVisible();
-  await expect(table.getByRole('button', { name: 'Return asset' })).toBeVisible();
-  await expect(table.getByText(/\d{2}:\d{2}/)).toBeVisible();
+  const currentRow = table.getByRole('row', { name: /Alpha Return Laptop/ });
+  await expect(currentRow.getByRole('button', { name: 'Return asset' })).toBeVisible();
+  await expect(currentRow.getByText(/\d{2}:\d{2}/)).toBeVisible();
+  const expiredRow = table.getByRole('row', { name: /Alpha Expired Laptop/ });
+  const expiredLifecycle = expiredRow.locator('syn-badge');
+  await expect(expiredLifecycle).toHaveText(/^Expired/);
+  await expiredRow.getByRole('button', { name: 'Return asset' }).click();
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(expiredLifecycle).toHaveText(/^Returned/);
+  await expect(expiredRow.getByRole('button', { name: 'Return asset' })).toHaveCount(0);
   expect(await table.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
   await context.close();
 });

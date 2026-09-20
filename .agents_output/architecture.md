@@ -157,9 +157,12 @@ reservation is permitted only if the extended interval does not overlap
 another reservation. Shortening a reservation is permitted as long as the end
 does not precede its start.
 
-A user may return an active reservation early. A future reservation may be
-cancelled by its user. Owners and the responsible Group Admins may end or cancel
-reservations administratively. These actions are audited.
+A user may return an active reservation early, or return a bounded active
+reservation after its scheduled end; the latter preserves the scheduled end as
+historical data. Future and terminal reservations cannot be returned. A future
+reservation may be cancelled by its user. Owners and the responsible Group
+Admins may end or cancel reservations administratively. These actions are
+audited.
 
 SQLite has no exclusion constraint for time ranges. Conflict detection and
 reservation creation therefore execute in one write transaction. The

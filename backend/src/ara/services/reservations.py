@@ -261,18 +261,21 @@ class ReservationService:
         actor_id: uuid.UUID,
         reservation_id: uuid.UUID,
     ) -> Reservation:
-        """Return an actor's currently active reservation at the current instant."""
+        """Return an actor's active reservation after it has started."""
         await self._begin_immediate()
         try:
             reservation, asset = await self._reservation_with_asset(reservation_id)
             AuthorizationService.require_group_user(actor_roles, asset.group_id)
             self._require_owner(reservation, actor_id)
             now = utc_now()
-            self._require_current(reservation, now)
+            self._require_returnable(reservation, now)
             before = reservation_snapshot(reservation)
             reservation.status = ReservationStatus.RETURNED
             reservation.returned_at = now
-            self._record_early_end(reservation, now)
+            # An elapsed end is historical schedule data. Current reservations
+            # retain the established early-return behavior instead.
+            if reservation.ends_at is None or reservation.ends_at > now:
+                self._record_early_end(reservation, now)
             await self.session.flush()
             self.audit.record(
                 action=AuditAction.RESERVATION_RETURN,
@@ -477,6 +480,17 @@ class ReservationService:
         if reservation.starts_at > now or (
             reservation.ends_at is not None and reservation.ends_at <= now
         ):
+            raise DomainError(
+                "reservation_not_current",
+                "Reservation is not currently active",
+                status_code=409,
+            )
+
+    @classmethod
+    def _require_returnable(cls, reservation: Reservation, now: datetime) -> None:
+        """Require an active reservation that has started, including an elapsed one."""
+        cls._require_nonterminal(reservation)
+        if reservation.starts_at > now:
             raise DomainError(
                 "reservation_not_current",
                 "Reservation is not currently active",

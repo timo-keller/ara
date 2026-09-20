@@ -52,6 +52,8 @@ describe('ReservationsPage', () => {
     expect(allowedReservationActions({ ...active, status: 'returned' })).toEqual([]);
     expect(allowedReservationActions(active)).toEqual(['cancel']);
     expect(allowedReservationActions({ ...active, lifecycle: 'current' })).toEqual(['return']);
+    expect(allowedReservationActions({ ...active, lifecycle: 'expired' })).toEqual(['return']);
+    expect(allowedReservationActions({ ...active, lifecycle: 'returned' })).toEqual([]);
     expect(lifecycleLabel(active)).toBe('Future');
   });
 
@@ -91,6 +93,33 @@ describe('ReservationsPage', () => {
     http.expectOne('/api/reservations/one/cancel').flush({ ...active, status: 'cancelled' });
     http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({ items: [], total: 0 });
     expect(fixture.componentInstance.success()).toContain('cancelled');
+  });
+
+  it('reconciles a stale expired return without an optimistic lifecycle change', () => {
+    const expired = { ...active, lifecycle: 'expired' as const };
+    const fixture = TestBed.createComponent(ReservationsPage);
+    fixture.detectChanges();
+    http
+      .expectOne('/api/reservations/mine?offset=0&limit=10')
+      .flush({ items: [expired], total: 1 });
+
+    fixture.componentInstance.confirm('return', expired);
+    fixture.componentInstance.performConfirmedAction();
+    http.expectOne('/api/reservations/one/return').flush(
+      {
+        error: {
+          code: 'reservation_terminal',
+          message: 'Terminal reservations cannot be changed',
+        },
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    expect(fixture.componentInstance.reservations()[0].lifecycle).toBe('expired');
+    http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({
+      items: [{ ...expired, status: 'returned', lifecycle: 'returned' }],
+      total: 1,
+    });
+    expect(fixture.componentInstance.error()).toContain('Terminal reservations');
   });
 
   it('turns conflicts into schedule guidance and reloads reservations', () => {
@@ -198,8 +227,8 @@ describe('ReservationsPage', () => {
       ),
     ).toEqual(['Current', 'Future', 'Expired', 'Returned', 'Cancelled', 'Ended']);
     expect(fixture.nativeElement.textContent).not.toContain('Select all lifecycles');
-    expect(fixture.nativeElement.textContent).not.toContain('Choose one or more lifecycles');
     expect(fixture.nativeElement.textContent).not.toContain('Clear lifecycle');
+    expect(fixture.nativeElement.textContent).not.toContain('Choose one or more lifecycles');
   });
 
   it('updates lifecycle filters through array values and stable query state', () => {

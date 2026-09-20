@@ -107,7 +107,7 @@ export function localReservationTime(value: string): string {
 export function allowedReservationActions(reservation: Reservation): Action[] {
   if (reservation.status !== 'active') return [];
   if (reservation.lifecycle === 'future') return ['cancel'];
-  if (reservation.lifecycle === 'current') return ['return'];
+  if (reservation.lifecycle === 'current' || reservation.lifecycle === 'expired') return ['return'];
   return [];
 }
 
@@ -280,11 +280,11 @@ export class ReservationsPage {
         );
         this.load();
       },
-      error: (error: unknown) => this.handleMutationError(error),
+      error: (error: unknown) => this.handleMutationError(error, pending.action === 'return'),
     });
   }
 
-  private handleMutationError(error: unknown): void {
+  private handleMutationError(error: unknown, reload = false): void {
     const body = (error as { error?: { error?: { code?: string; message?: string } } }).error
       ?.error;
     this.error.set(
@@ -292,7 +292,7 @@ export class ReservationsPage {
         ? 'That change conflicts with the current schedule. Review the asset schedule and choose an earlier end.'
         : body?.message || 'The reservation could not be changed. Refresh and try again.',
     );
-    if (body?.code === 'reservation_conflict') this.load();
+    if (body?.code === 'reservation_conflict' || reload) this.load();
   }
 
   private navigate(filters: ReservationFilters): void {

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ara.core.errors import DomainError
 from ara.domain.models import (
     Asset,
+    AuditEvent,
     Group,
     GroupRole,
     Reservation,
@@ -18,6 +19,7 @@ from ara.domain.models import (
     User,
 )
 from ara.infrastructure.database import Base, create_engine, create_session_factory
+from ara.services.audit import AuditContext
 from ara.services.authorization import EffectiveRoles
 from ara.services.reservations import ReservationService
 
@@ -242,6 +244,121 @@ async def test_lifecycle_transitions_and_conflicts_are_atomic(
                 reservation_id=reservation_id,
                 ends_at=now + timedelta(days=1),
             )
+
+
+@pytest.mark.asyncio
+async def test_owner_can_return_elapsed_reservations_without_rewriting_history(
+    reservation_database: tuple[async_sessionmaker[AsyncSession], uuid.UUID, uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    factory, asset_id, user_id = reservation_database
+    now = datetime(2030, 1, 2, 10, tzinfo=UTC)
+    monkeypatch.setattr("ara.services.reservations.utc_now", lambda: now)
+
+    async with factory() as session:
+        asset = await session.get(Asset, asset_id)
+        assert asset is not None
+        roles = EffectiveRoles(
+            is_owner=False, group_roles={asset.group_id: GroupRole.USER}
+        )
+        service = ReservationService(session, AuditContext(actor_id=user_id))
+        scheduled_end = now
+        exact_end = await service.create(
+            asset_id=asset_id,
+            user_id=user_id,
+            starts_at=now - timedelta(hours=1),
+            ends_at=scheduled_end,
+        )
+
+        returned = await service.return_own(
+            roles, actor_id=user_id, reservation_id=exact_end.id
+        )
+        assert returned.status is ReservationStatus.RETURNED
+        assert returned.returned_at == now
+        assert returned.ends_at == scheduled_end
+        event = await session.scalar(
+            select(AuditEvent)
+            .where(AuditEvent.action == "reservation.return")
+            .order_by(AuditEvent.created_at.desc())
+        )
+        assert event is not None
+        assert event.before_state is not None
+        assert event.after_state is not None
+        assert event.before_state["status"] == "active"
+        assert event.before_state["returned_at"] is None
+        assert event.before_state["ends_at"] == scheduled_end.isoformat()
+        assert event.after_state["status"] == "returned"
+        assert event.after_state["returned_at"] == now.isoformat()
+        assert event.after_state["ends_at"] == scheduled_end.isoformat()
+        assert (
+            await service.list_asset_schedule(
+                roles, asset_id=asset_id, offset=0, limit=10
+            )
+        )[1] == 0
+        await service.ensure_available(
+            asset_id=asset_id,
+            starts_at=now - timedelta(hours=1),
+            ends_at=now,
+        )
+
+        later_end = now - timedelta(hours=2)
+        elapsed = await service.create(
+            asset_id=asset_id,
+            user_id=user_id,
+            starts_at=later_end - timedelta(hours=1),
+            ends_at=later_end,
+        )
+        returned_later = await service.return_own(
+            roles, actor_id=user_id, reservation_id=elapsed.id
+        )
+        assert returned_later.returned_at == now
+        assert returned_later.ends_at == later_end
+
+
+@pytest.mark.asyncio
+async def test_return_guard_rejections_do_not_mutate_or_audit(
+    reservation_database: tuple[async_sessionmaker[AsyncSession], uuid.UUID, uuid.UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    factory, asset_id, user_id = reservation_database
+    now = datetime(2030, 1, 2, 10, tzinfo=UTC)
+    monkeypatch.setattr("ara.services.reservations.utc_now", lambda: now)
+
+    async with factory() as session:
+        asset = await session.get(Asset, asset_id)
+        assert asset is not None
+        roles = EffectiveRoles(
+            is_owner=False, group_roles={asset.group_id: GroupRole.USER}
+        )
+        service = ReservationService(session, AuditContext(actor_id=user_id))
+        future = await service.create(
+            asset_id=asset_id,
+            user_id=user_id,
+            starts_at=now + timedelta(hours=1),
+            ends_at=now + timedelta(hours=2),
+        )
+        future_id = future.id
+        baseline = await session.scalar(select(func.count()).select_from(AuditEvent))
+        assert baseline is not None
+        for actor_roles, actor_id, reservation_id, status_code in (
+            (roles, user_id, future_id, 409),
+            (roles, uuid.uuid4(), future_id, 403),
+            (EffectiveRoles(is_owner=False, group_roles={}), user_id, future_id, 403),
+            (roles, user_id, uuid.uuid4(), 404),
+        ):
+            with pytest.raises(DomainError) as error:
+                await service.return_own(
+                    actor_roles, actor_id=actor_id, reservation_id=reservation_id
+                )
+            assert error.value.status_code == status_code
+        persisted = await session.get(Reservation, future_id)
+        assert persisted is not None
+        assert persisted.status is ReservationStatus.ACTIVE
+        assert persisted.returned_at is None
+        assert (
+            await session.scalar(select(func.count()).select_from(AuditEvent))
+            == baseline
+        )
 
 
 @pytest.mark.asyncio

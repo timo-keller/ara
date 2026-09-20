@@ -163,14 +163,17 @@ interval.
 active reservation to a strictly later UTC `ends_at`; the full revised interval
 is checked under the same `BEGIN IMMEDIATE` lock as creation.  Open-ended and
 terminal reservations cannot be extended. `POST /api/reservations/{id}/return`
-returns only the authenticated user's reservation after it has started and
-before its scheduled end. `POST /api/reservations/{id}/cancel` cancels only a
-future reservation: its owner may cancel it, as may an Owner or Group Admin for
-the asset's group. `POST /api/reservations/{id}/end` ends a currently active
-reservation and is restricted to those administrators. At the exact start time
-a reservation is no longer future for cancellation and is returnable/endable;
-at its exact end it is no longer returnable/endable. All lifecycle POST routes
-require CSRF and reject terminal/repeated operations with `409`.
+returns only the authenticated user's active reservation after it has started:
+a current reservation, or a bounded elapsed reservation including exactly at
+its scheduled end. Returning an elapsed reservation preserves its scheduled
+end as historical data. Future and terminal reservations are not returnable.
+`POST /api/reservations/{id}/cancel` cancels only a future reservation: its
+owner may cancel it, as may an Owner or Group Admin for the asset's group.
+`POST /api/reservations/{id}/end` ends a currently active reservation and is
+restricted to those administrators. At the exact start time a reservation is
+no longer future for cancellation and is returnable/endable; at its exact end
+it is returnable but no longer endable. All lifecycle POST routes require CSRF
+and reject terminal/repeated operations with `409`.
 
 ## Audit API
 
