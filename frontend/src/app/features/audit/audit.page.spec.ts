@@ -109,6 +109,8 @@ describe('AuditPage', () => {
     expect(fixture.nativeElement.textContent).toContain('New asset (new)');
     expect(fixture.nativeElement.textContent).toContain('Unavailable historical entity (old)');
     expect(fixture.nativeElement.textContent).toContain('Search name or UUID.');
+    expect(fixture.nativeElement.querySelector('.audit-results .events')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.audit-results syn-pagination')).not.toBeNull();
   });
 
   it('accepts a single legacy audit selection and serializes multiple selections repeatedly', () => {

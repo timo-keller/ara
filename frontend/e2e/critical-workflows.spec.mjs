@@ -392,3 +392,53 @@ test('Administration content scrolls without moving the desktop rail', async ({ 
   ).toBe(true);
   await context.close();
 });
+
+test('Audit history keeps its desktop surface fixed while event cards scroll', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'e2e-owner');
+
+  for (let index = 0; index < 30; index += 1) {
+    const response = await csrfFetch(page, '/api/groups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: `Scrollable audit group ${index}` }),
+    });
+    expect(response.status).toBe(201);
+  }
+
+  await page.goto(`${baseURL()}/audit`);
+  await expect(page.getByRole('heading', { name: 'Audit history' })).toBeVisible();
+  const shell = page.locator('.appshell');
+  const main = page.locator('.appshell-main');
+  const content = page.locator('.appshell-content-inner');
+  const events = page.locator('.audit-results .events');
+  const rail = page.locator('syn-side-nav');
+  await expect(events.locator('syn-card').first()).toBeVisible();
+  await expect(main).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(content).toHaveCSS('overflow-y', 'hidden');
+  await expect(events).toHaveCSS('overflow-y', 'auto');
+  expect(await events.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  expect(
+    await shell.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
+  ).toBe(true);
+
+  const mainBeforeScroll = await main.boundingBox();
+  const railBeforeScroll = await rail.boundingBox();
+  await events.evaluate((node) => (node.scrollTop = node.scrollHeight));
+  expect(await events.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  expect(await main.boundingBox()).toEqual(mainBeforeScroll);
+  expect(await rail.boundingBox()).toEqual(railBeforeScroll);
+  await expect(page.locator('syn-pagination[aria-label="Audit history pages"]')).toBeVisible();
+
+  await page.setViewportSize({ width: 640, height: 720 });
+  await expect(events).toHaveCSS('overflow-y', 'visible');
+  expect(
+    await shell.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
+  ).toBe(true);
+  await page.locator('syn-pagination[aria-label="Audit history pages"]').scrollIntoViewIfNeeded();
+  await expect(page.locator('syn-pagination[aria-label="Audit history pages"]')).toBeVisible();
+  await context.close();
+});

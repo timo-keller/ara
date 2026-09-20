@@ -90,45 +90,49 @@
     <p class="state" aria-live="polite">No audit events match these filters.</p>
   }
   @if (state() === 'ready' && items().length) {
-    <div class="events" aria-live="polite">
-      @for (event of items(); track event.id) {
-        <syn-card
-          ><h2 slot="header">{{ event.action }} · {{ event.target_type }}</h2>
-          <dl>
-            <dt>Time</dt>
-            <dd>{{ event.created_at | date: 'medium' : 'UTC' }} UTC</dd>
-            <dt>Group</dt>
-            <dd>{{ groupName(event.group_id) }}</dd>
-            <dt>Actor</dt>
-            <dd>{{ entityName(event.actor_name, event.actor_id) }}</dd>
-            <dt>Target</dt>
-            <dd>
-              {{ entityName(event.target_name, event.target_id, 'Unavailable historical entity') }}
-            </dd>
-          </dl>
-          <syn-details summary="View change details" contained
-            ><div class="states">
-              <section>
-                <h3>Before</h3>
-                <pre>{{ stateJson(event.before_state) }}</pre>
-              </section>
-              <section>
-                <h3>After</h3>
-                <pre>{{ stateJson(event.after_state) }}</pre>
-              </section>
-            </div></syn-details
-          ></syn-card
-        >
-      }
+    <div class="audit-results">
+      <div class="events" aria-live="polite">
+        @for (event of items(); track event.id) {
+          <syn-card
+            ><h2 slot="header">{{ event.action }} · {{ event.target_type }}</h2>
+            <dl>
+              <dt>Time</dt>
+              <dd>{{ event.created_at | date: 'medium' : 'UTC' }} UTC</dd>
+              <dt>Group</dt>
+              <dd>{{ groupName(event.group_id) }}</dd>
+              <dt>Actor</dt>
+              <dd>{{ entityName(event.actor_name, event.actor_id) }}</dd>
+              <dt>Target</dt>
+              <dd>
+                {{
+                  entityName(event.target_name, event.target_id, 'Unavailable historical entity')
+                }}
+              </dd>
+            </dl>
+            <syn-details summary="View change details" contained
+              ><div class="states">
+                <section>
+                  <h3>Before</h3>
+                  <pre>{{ stateJson(event.before_state) }}</pre>
+                </section>
+                <section>
+                  <h3>After</h3>
+                  <pre>{{ stateJson(event.after_state) }}</pre>
+                </section>
+              </div></syn-details
+            ></syn-card
+          >
+        }
+      </div>
+      <syn-pagination
+        aria-label="Audit history pages"
+        [currentPage]="page()"
+        [pageSize]="filters().limit"
+        [pageSizeOptions]="[10, 25, 50, 100]"
+        [totalItems]="total()"
+        (synPaginationPageChangedEvent)="changePage($event)"
+        (synPaginationPageSizeChangedEvent)="changePageSize($event)"
+      ></syn-pagination>
     </div>
-    <syn-pagination
-      aria-label="Audit history pages"
-      [currentPage]="page()"
-      [pageSize]="filters().limit"
-      [pageSizeOptions]="[10, 25, 50, 100]"
-      [totalItems]="total()"
-      (synPaginationPageChangedEvent)="changePage($event)"
-      (synPaginationPageSizeChangedEvent)="changePageSize($event)"
-    ></syn-pagination>
   }
 </section>

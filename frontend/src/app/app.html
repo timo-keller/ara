@@ -70,8 +70,15 @@
           Log out
         </syn-nav-item>
       </syn-side-nav>
-      <div class="appshell-content-inner">
-        <main class="appshell-main" tabindex="-1">
+      <div
+        class="appshell-content-inner"
+        [class.appshell-content-inner--audit]="isCurrent('/audit')"
+      >
+        <main
+          class="appshell-main"
+          [class.appshell-main--audit]="isCurrent('/audit')"
+          tabindex="-1"
+        >
           <router-outlet />
         </main>
       </div>

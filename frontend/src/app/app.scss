@@ -54,6 +54,20 @@
     min-height: 0;
     overflow-y: auto;
   }
+
+  /*
+   * Audit owns its result-list scroll area so its white main surface remains
+   * fixed. Keep this route-specific: ticket 069 can give Administration its
+   * own scroll owner without changing the shared shell behaviour.
+   */
+  .appshell-content-inner--audit {
+    overflow: hidden;
+  }
+
+  .appshell-main--audit {
+    display: flex;
+    min-height: 0;
+  }
 }
 
 @media (max-width: 640px) {

@@ -14,6 +14,43 @@
   gap: var(--syn-spacing-large);
   margin-bottom: var(--syn-spacing-large);
 }
+
+@media (min-width: 641px) {
+  :host {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .route-page {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .route-page > :not(.audit-results) {
+    flex: 0 0 auto;
+  }
+
+  .audit-results {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .events {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  syn-pagination {
+    flex: 0 0 auto;
+  }
+}
 dl {
   display: grid;
   grid-template-columns: max-content 1fr;
