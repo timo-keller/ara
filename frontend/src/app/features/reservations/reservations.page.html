@@ -22,7 +22,12 @@
       @for (reservation of reservations(); track reservation.id) {
         <syn-card>
           <h2 slot="header">
-            Asset <a [routerLink]="['/assets', reservation.asset_id]">{{ reservation.asset_id }}</a>
+            @if (reservation.asset_name) {
+              Asset
+              <a [routerLink]="['/assets', reservation.asset_id]">{{ reservation.asset_name }}</a>
+            } @else {
+              Asset unavailable
+            }
           </h2>
           <p>
             <syn-badge>{{ reservation.status }}</syn-badge>

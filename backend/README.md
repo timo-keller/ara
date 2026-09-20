@@ -148,7 +148,9 @@ constraint for multi-process deployments.
 
 Authenticated group members create their own reservations with `POST
 /api/reservations`; the CSRF token is required. `GET /api/reservations/mine`
-lists the current user's reservations newest-first, and `GET
+lists the current user's reservations newest-first and includes `asset_name`
+only when the referenced asset remains visible to that user; otherwise it is
+`null`. `GET
 /api/assets/{asset_id}/reservations` lists an accessible asset's active schedule
 chronologically. Both lists use `offset` and `limit` pagination and a stable
 identifier tie-breaker. Creation rejects archived groups or assets and requires

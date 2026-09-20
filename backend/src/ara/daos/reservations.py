@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ara.domain.models import Reservation, ReservationStatus
+from ara.domain.models import Asset, Group, Reservation, ReservationStatus
 
 
 class ReservationDAO:
@@ -23,20 +23,30 @@ class ReservationDAO:
         """Return a reservation by identifier without applying access policy."""
         return await self.session.get(Reservation, reservation_id)
 
-    async def list_for_user(
+    async def list_for_user_with_assets(
         self, *, user_id: uuid.UUID, offset: int, limit: int
-    ) -> tuple[list[Reservation], int]:
-        """Return one user's reservations in stable newest-first order."""
+    ) -> tuple[list[tuple[Reservation, str | None, uuid.UUID | None, bool, bool]], int]:
+        """Return one user's reservations with their asset visibility details."""
         statement = select(Reservation).where(Reservation.user_id == user_id)
         total = await self.session.scalar(
             select(func.count()).select_from(statement.subquery())
         )
-        result = await self.session.scalars(
-            statement.order_by(Reservation.starts_at.desc(), Reservation.id.desc())
+        result = await self.session.execute(
+            select(
+                Reservation,
+                Asset.name,
+                Group.id,
+                Asset.archived_at.is_not(None),
+                Group.archived_at.is_not(None),
+            )
+            .outerjoin(Asset, Reservation.asset_id == Asset.id)
+            .outerjoin(Group, Asset.group_id == Group.id)
+            .where(Reservation.user_id == user_id)
+            .order_by(Reservation.starts_at.desc(), Reservation.id.desc())
             .offset(offset)
             .limit(limit)
         )
-        return list(result), total or 0
+        return list(result.tuples()), total or 0
 
     async def list_active_for_asset(
         self, *, asset_id: uuid.UUID, offset: int, limit: int

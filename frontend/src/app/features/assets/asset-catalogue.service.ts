@@ -46,6 +46,7 @@ export interface Group {
 export interface Reservation {
   id: string;
   asset_id: string;
+  asset_name: string | null;
   starts_at: string;
   ends_at: string | null;
   status: 'active' | 'returned' | 'cancelled' | 'ended';

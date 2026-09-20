@@ -132,12 +132,38 @@ class ReservationService:
         return reservation
 
     async def list_own(
-        self, *, user_id: uuid.UUID, offset: int, limit: int
+        self,
+        actor_roles: EffectiveRoles,
+        *,
+        user_id: uuid.UUID,
+        offset: int,
+        limit: int,
     ) -> tuple[list[Reservation], int]:
-        """List reservations belonging only to the authenticated user."""
-        return await self.reservations.list_for_user(
+        """List an actor's reservations with names only for visible assets."""
+        rows, total = await self.reservations.list_for_user_with_assets(
             user_id=user_id, offset=offset, limit=limit
         )
+        reservations = []
+        for reservation, name, group_id, asset_archived, group_archived in rows:
+            # Match AssetService.get visibility while retaining the reservation
+            # record for its owner. A missing historical asset or group also has
+            # no display name.
+            if (
+                name is not None
+                and group_id is not None
+                and actor_roles.is_group_user(group_id)
+                and (actor_roles.is_owner or not group_archived)
+                and (
+                    actor_roles.is_owner
+                    or not asset_archived
+                    or actor_roles.is_group_admin(group_id)
+                )
+            ):
+                setattr(reservation, "asset_name", name)
+            else:
+                setattr(reservation, "asset_name", None)
+            reservations.append(reservation)
+        return reservations, total
 
     async def extend_own(
         self,

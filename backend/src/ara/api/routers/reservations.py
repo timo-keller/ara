@@ -115,12 +115,13 @@ async def end_reservation(
 @api_router.get("/reservations/mine", response_model=ReservationListSchema)
 async def list_own_reservations(
     user: Annotated[User, Depends(require_authenticated_user)],
+    roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     session: Annotated[AsyncSession, Depends(get_session)],
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> ReservationListSchema:
     reservations, total = await ReservationService(session).list_own(
-        user_id=user.id, offset=offset, limit=limit
+        roles, user_id=user.id, offset=offset, limit=limit
     )
     return ReservationListSchema(
         items=[_reservation_schema(reservation) for reservation in reservations],

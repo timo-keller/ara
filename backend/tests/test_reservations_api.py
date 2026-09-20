@@ -142,11 +142,53 @@ def test_reservation_api_creation_access_schedule_and_pagination(
     mine = client.get("/api/reservations/mine", params={"limit": 1}).json()
     assert mine["total"] == 1
     assert len(mine["items"]) == 1
+    assert mine["items"][0]["asset_id"] == laptop
+    assert mine["items"][0]["asset_name"] == "Laptop"
     schedule = client.get(
         f"/api/assets/{laptop}/reservations", params={"limit": 1}
     ).json()
     assert schedule["total"] == 1
     assert schedule["items"][0]["id"] == created.json()["id"]
+
+
+def test_own_reservation_asset_names_follow_asset_visibility(
+    reservation_api_client: ApiClient,
+) -> None:
+    client, factory, user, roles = reservation_api_client
+    lab, _, _, laptop, _ = _fixtures(factory)
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(lab): GroupRole.USER}
+    )
+    starts_at = datetime(2030, 1, 2, 10, tzinfo=UTC)
+    created = client.post(
+        "/api/reservations",
+        json={"asset_id": laptop, "starts_at": starts_at.isoformat()},
+    )
+    assert created.status_code == 201
+
+    visible = client.get("/api/reservations/mine").json()["items"][0]
+    assert visible["asset_id"] == laptop
+    assert visible["asset_name"] == "Laptop"
+
+    roles["value"] = EffectiveRoles(is_owner=False, group_roles={})
+    scoped = client.get("/api/reservations/mine").json()["items"][0]
+    assert scoped["asset_id"] == laptop
+    assert scoped["asset_name"] is None
+
+    async def archive_asset() -> None:
+        async with factory() as session:
+            asset = await session.get(Asset, uuid.UUID(laptop))
+            assert asset is not None
+            asset.archived_at = datetime(2030, 1, 1, tzinfo=UTC)
+            await session.commit()
+
+    asyncio.run(archive_asset())
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(lab): GroupRole.USER}
+    )
+    unavailable = client.get("/api/reservations/mine").json()["items"][0]
+    assert unavailable["asset_id"] == laptop
+    assert unavailable["asset_name"] is None
 
 
 def test_reservation_lifecycle_api_routes(

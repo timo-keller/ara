@@ -8,6 +8,7 @@ const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 const active = {
   id: 'one',
   asset_id: 'asset',
+  asset_name: 'Lab laptop',
   starts_at: future,
   ends_at: future,
   status: 'active' as const,
@@ -34,6 +35,20 @@ describe('ReservationsPage', () => {
         starts_at: new Date(Date.now() - 1000).toISOString(),
       }),
     ).toEqual(['return']);
+  });
+
+  it('displays the API-provided asset name and an accessible unavailable fallback', () => {
+    const fixture = TestBed.createComponent(ReservationsPage);
+    fixture.detectChanges();
+    http.expectOne('/api/reservations/mine').flush({ items: [active] });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a')?.textContent?.trim()).toBe('Lab laptop');
+
+    fixture.componentInstance.load();
+    http.expectOne('/api/reservations/mine').flush({ items: [{ ...active, asset_name: null }] });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Asset unavailable');
+    expect(fixture.nativeElement.querySelector('a')).toBeNull();
   });
 
   it('waits for confirmation before returning, then reloads own reservations', () => {

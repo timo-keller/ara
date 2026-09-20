@@ -47,6 +47,7 @@ test('authenticated discovery, future/open-ended conflicts, extension, cancellat
   await page.getByRole('button', { name: 'Reserve', exact: true }).click();
   await expect(page.getByText('This time conflicts with the current schedule.')).toBeVisible();
   await page.goto(`${baseURL()}/reservations`);
+  await expect(page.getByRole('link', { name: 'Alpha Laptop' })).toBeVisible();
   await page.getByRole('button', { name: 'Cancel reservation' }).click();
   await page.getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByText('Reservation cancelled')).toBeVisible();
