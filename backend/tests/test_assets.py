@@ -11,7 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ara.api.routers import auth as auth_router
 from ara.api.routers import groups as group_router
 from ara.api.schemas.assets import _safe_metadata
-from ara.domain.models import Group, GroupRole, Reservation, User, utc_now
+from ara.domain.models import (
+    Group,
+    GroupRole,
+    Reservation,
+    ReservationStatus,
+    User,
+    utc_now,
+)
 from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
 from ara.services.authorization import EffectiveRoles
@@ -108,7 +115,11 @@ def test_asset_api_roles_filters_pagination_archival_and_credentials(
     assert client.get("/api/assets", params={"text": "LINUX"}).json()["total"] == 1
     assert client.get("/api/assets", params={"availability": "reserved"}).json()[
         "items"
-    ][0] == {**beta, "availability": "reserved"}
+    ][0] == {
+        **beta,
+        "availability": "reserved",
+        "reserved_by_display_name": "Unknown user",
+    }
     available_items = client.get(
         "/api/assets", params={"availability": "available"}
     ).json()["items"]
@@ -178,6 +189,127 @@ def test_asset_response_metadata_removes_legacy_credential_like_keys() -> None:
         "host": "lab",
         "nested": {},
     }
+
+
+def test_asset_catalogue_current_reservation_holders_are_scoped_and_safe(
+    asset_api_client: ApiClient,
+) -> None:
+    client, factory, roles = asset_api_client
+    alpha, bravo, _archived = _groups(factory)
+    named = _create(client, alpha, "Named", "device", "")
+    fallback = _create(client, alpha, "Fallback", "device", "")
+    _create(client, alpha, "Available", "device", "")
+    future = _create(client, alpha, "Future", "device", "")
+    ended = _create(client, alpha, "Ended", "device", "")
+    terminal = _create(client, alpha, "Terminal", "device", "")
+    open_ended = _create(client, bravo, "Open ended", "device", "")
+    _seed_holder_reservations(
+        factory,
+        {
+            "named": str(named["id"]),
+            "fallback": str(fallback["id"]),
+            "future": str(future["id"]),
+            "ended": str(ended["id"]),
+            "terminal": str(terminal["id"]),
+            "open_ended": str(open_ended["id"]),
+        },
+    )
+
+    items = {item["name"]: item for item in client.get("/api/assets").json()["items"]}
+    assert items["Named"]["reserved_by_display_name"] == "Ada Lovelace"
+    assert items["Fallback"]["reserved_by_display_name"] == "fallback@example.test"
+    assert items["Open ended"]["reserved_by_display_name"] == "Unknown user"
+    for name in ("Available", "Future", "Ended", "Terminal"):
+        assert items[name]["availability"] == "available"
+        assert items[name]["reserved_by_display_name"] is None
+
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(alpha): GroupRole.GROUP_ADMIN}
+    )
+    admin_items = {
+        item["name"]: item for item in client.get("/api/assets").json()["items"]
+    }
+    assert admin_items["Named"]["reserved_by_display_name"] == "Ada Lovelace"
+    assert "Open ended" not in admin_items
+
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(alpha): GroupRole.USER}
+    )
+    member_items = {
+        item["name"]: item for item in client.get("/api/assets").json()["items"]
+    }
+    assert (
+        member_items["Fallback"]["reserved_by_display_name"] == "fallback@example.test"
+    )
+    assert "Open ended" not in member_items
+    assert client.get(f"/api/assets/{open_ended['id']}").status_code != 200
+
+
+def _seed_holder_reservations(
+    factory: async_sessionmaker[AsyncSession], asset_ids: dict[str, str]
+) -> None:
+    async def seed() -> None:
+        async with factory() as session:
+            now = utc_now()
+            named = User(
+                oidc_issuer="https://issuer.example",
+                oidc_subject="named-holder",
+                display_name="Ada Lovelace",
+                email="not-disclosed@example.test",
+            )
+            fallback = User(
+                oidc_issuer="https://issuer.example",
+                oidc_subject="fallback-holder",
+                display_name="  ",
+                email="fallback@example.test",
+            )
+            unknown = User(
+                oidc_issuer="https://issuer.example", oidc_subject="unknown-holder"
+            )
+            session.add_all([named, fallback, unknown])
+            session.add_all(
+                [
+                    Reservation(
+                        asset_id=uuid.UUID(asset_ids["named"]),
+                        user=named,
+                        starts_at=now - timedelta(minutes=1),
+                        ends_at=now + timedelta(minutes=1),
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(asset_ids["fallback"]),
+                        user=fallback,
+                        starts_at=now - timedelta(minutes=1),
+                        ends_at=now + timedelta(minutes=1),
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(asset_ids["future"]),
+                        user=named,
+                        starts_at=now + timedelta(minutes=1),
+                        ends_at=now + timedelta(minutes=2),
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(asset_ids["ended"]),
+                        user=named,
+                        starts_at=now - timedelta(minutes=2),
+                        ends_at=now,
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(asset_ids["terminal"]),
+                        user=named,
+                        starts_at=now - timedelta(minutes=1),
+                        ends_at=now + timedelta(minutes=1),
+                        status=ReservationStatus.RETURNED,
+                    ),
+                    Reservation(
+                        asset_id=uuid.UUID(asset_ids["open_ended"]),
+                        user=unknown,
+                        starts_at=now - timedelta(minutes=1),
+                    ),
+                ]
+            )
+            await session.commit()
+
+    asyncio.run(seed())
 
 
 def _create(

@@ -47,11 +47,21 @@ describe('AssetCataloguePage', () => {
           archived_at: '2026-01-01',
           availability: 'reserved',
         },
+        {
+          id: 'reserved',
+          name: 'Reserved asset',
+          asset_type: 'device',
+          description: null,
+          archived_at: null,
+          availability: 'reserved',
+          reserved_by_display_name: 'Ada Lovelace',
+        },
       ],
     });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Active asset');
     expect(fixture.nativeElement.textContent).toContain('Available now');
+    expect(fixture.nativeElement.textContent).toContain('Reserved by Ada Lovelace');
     expect(fixture.nativeElement.textContent).not.toContain('Archived asset');
     const table = fixture.nativeElement.querySelector('table');
     expect(table).not.toBeNull();
@@ -69,6 +79,11 @@ describe('AssetCataloguePage', () => {
       'device',
       'No description provided.',
       'Available now',
+      'View details',
+      'Reserved asset',
+      'device',
+      'No description provided.',
+      'Reserved by Ada Lovelace',
       'View details',
     ]);
     expect(table.querySelector('td[data-label="Asset name"]')?.getAttribute('headers')).toBe(

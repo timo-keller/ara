@@ -82,8 +82,13 @@ class AssetService:
             limit=limit,
         )
         assets = []
-        for asset, is_reserved in rows:
-            setattr(asset, "availability", "reserved" if is_reserved else "available")
+        for asset, reserved_by_display_name in rows:
+            setattr(
+                asset,
+                "availability",
+                "reserved" if reserved_by_display_name is not None else "available",
+            )
+            setattr(asset, "reserved_by_display_name", reserved_by_display_name)
             assets.append(asset)
         return assets, total
 

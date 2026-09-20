@@ -36,6 +36,17 @@ async def seed(database_url: str, issuer: str) -> None:
             name="Bravo Lab",
             description="E2E Bravo scope",
         )
+        reserved_asset = Asset(
+            id=uuid.UUID("40000000-0000-0000-0000-000000000004"),
+            group=alpha,
+            name="Alpha Reserved Laptop",
+            asset_type="laptop",
+        )
+        holder = User(
+            oidc_issuer=issuer,
+            oidc_subject="e2e-holder",
+            display_name="E2E Holder",
+        )
         session.add_all(
             [
                 alpha,
@@ -62,12 +73,14 @@ async def seed(database_url: str, issuer: str) -> None:
                     name="Alpha Return Laptop",
                     asset_type="laptop",
                 ),
+                reserved_asset,
                 Asset(group=bravo, name="Bravo Laptop", asset_type="laptop"),
                 User(
                     oidc_issuer=issuer,
                     oidc_subject="alpha-user",
                     display_name="alpha-user",
                 ),
+                holder,
             ]
         )
         await session.flush()
@@ -83,6 +96,12 @@ async def seed(database_url: str, issuer: str) -> None:
                 Reservation(
                     asset_id=return_asset.id,
                     user_id=alpha_user.id,
+                    starts_at=utc_now() - timedelta(hours=1),
+                    status=ReservationStatus.ACTIVE,
+                ),
+                Reservation(
+                    asset_id=reserved_asset.id,
+                    user_id=holder.id,
                     starts_at=utc_now() - timedelta(hours=1),
                     status=ReservationStatus.ACTIVE,
                 ),

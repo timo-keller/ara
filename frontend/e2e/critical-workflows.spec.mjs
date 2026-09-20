@@ -48,6 +48,9 @@ test('authenticated discovery, future/open-ended conflicts, extension, cancellat
   await page.goto(`${baseURL()}/assets`);
   await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
   await expect(page.getByText('Alpha Laptop')).toBeVisible();
+  const catalogue = page.getByRole('table');
+  await expect(catalogue.getByRole('cell', { name: 'Available now' })).toBeVisible();
+  await expect(catalogue.getByRole('cell', { name: 'Reserved by E2E Holder' })).toBeVisible();
   await expect(page.getByText('Bravo Laptop')).toHaveCount(0);
   await page.getByText('Alpha Laptop').first().click();
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -60,7 +63,7 @@ test('authenticated discovery, future/open-ended conflicts, extension, cancellat
   await page.getByRole('button', { name: 'Reserve', exact: true }).click();
   await expect(page.getByText('This time conflicts with the current schedule.')).toBeVisible();
   await page.goto(`${baseURL()}/reservations`);
-  await expect(page.getByRole('link', { name: 'Alpha Laptop' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Alpha Laptop', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Cancel reservation' }).click();
   await page.getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByText('Reservation cancelled')).toBeVisible();
@@ -107,6 +110,7 @@ test('asset catalogue exposes responsive table results and keyboard detail navig
     'Details',
   ]);
   await expect(table.getByRole('link', { name: 'Alpha Laptop', exact: true })).toBeVisible();
+  await expect(table.getByText('Reserved by E2E Holder', { exact: true })).toBeVisible();
   const details = table.getByRole('link', { name: 'View details for Alpha Laptop' });
   await expect(details).toBeVisible();
   expect(await table.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);

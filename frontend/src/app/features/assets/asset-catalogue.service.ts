@@ -29,6 +29,7 @@ export interface Asset {
 
 export interface CatalogueAsset extends Asset {
   availability: 'available' | 'reserved';
+  reserved_by_display_name: string | null;
 }
 
 export interface AssetPage {

@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ara.domain.models import Asset, Reservation, ReservationStatus, utc_now
+from ara.domain.models import Asset, Reservation, ReservationStatus, User, utc_now
 
 
 class AssetDAO:
@@ -33,7 +33,7 @@ class AssetDAO:
         archived: bool | None,
         offset: int,
         limit: int,
-    ) -> tuple[list[tuple[Asset, bool]], int]:
+    ) -> tuple[list[tuple[Asset, str | None]], int]:
         """Return a stable page and total without applying access rules."""
         filters = []
         if group_ids is not None:
@@ -48,16 +48,31 @@ class AssetDAO:
                 or_(Asset.name.ilike(pattern), Asset.description.ilike(pattern))
             )
         now = utc_now()
-        reserved_now = (
-            select(Reservation.id)
+        # Keep this correlated lookup in the catalogue query so the caller never
+        # needs to request reservations for individual assets.  A scalar subquery
+        # also keeps an unexpected duplicate active reservation from duplicating
+        # an asset row.
+        reserved_by_display_name = (
+            select(
+                func.coalesce(
+                    func.nullif(func.trim(User.display_name), ""),
+                    func.nullif(func.trim(User.email), ""),
+                    "Unknown user",
+                )
+            )
+            .select_from(Reservation)
+            .join(User, User.id == Reservation.user_id)
             .where(
                 Reservation.asset_id == Asset.id,
                 Reservation.status == ReservationStatus.ACTIVE,
                 Reservation.starts_at <= now,
                 or_(Reservation.ends_at.is_(None), Reservation.ends_at > now),
             )
-            .exists()
+            .order_by(Reservation.id)
+            .limit(1)
+            .scalar_subquery()
         )
+        reserved_now = reserved_by_display_name.is_not(None)
         if availability is not None:
             filters.append(
                 reserved_now if availability == "reserved" else ~reserved_now
@@ -66,11 +81,14 @@ class AssetDAO:
             filters.append(Asset.archived_at.is_not(None))
         elif archived is False:
             filters.append(Asset.archived_at.is_(None))
-        statement = select(Asset, reserved_now.label("is_reserved")).where(*filters)
+        statement = select(
+            Asset,
+            reserved_by_display_name.label("reserved_by_display_name"),
+        ).where(*filters)
         total = await self.session.scalar(
             select(func.count()).select_from(statement.subquery())
         )
         result = await self.session.execute(
             statement.order_by(Asset.name, Asset.id).offset(offset).limit(limit)
         )
-        return [(asset, is_reserved) for asset, is_reserved in result], total or 0
+        return [(asset, holder) for asset, holder in result], total or 0

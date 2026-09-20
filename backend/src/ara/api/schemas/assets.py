@@ -129,6 +129,7 @@ class AssetSchema(BaseModel):
 
 class AssetListItemSchema(AssetSchema):
     availability: Literal["available", "reserved"]
+    reserved_by_display_name: str | None = None
 
 
 class AssetListSchema(BaseModel):

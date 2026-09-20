@@ -90,7 +90,11 @@
                 {{ asset.description || 'No description provided.' }}
               </td>
               <td data-label="Availability" headers="asset-availability">
-                {{ asset.availability === 'available' ? 'Available now' : 'Reserved now' }}
+                {{
+                  asset.reserved_by_display_name
+                    ? 'Reserved by ' + asset.reserved_by_display_name
+                    : 'Available now'
+                }}
               </td>
               <td data-label="Details" headers="asset-details">
                 <a
