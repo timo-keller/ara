@@ -1,3 +1,10 @@
+syn-dropdown::part(panel) {
+  background: var(--syn-panel-background-color);
+  border: var(--syn-panel-border-width) solid var(--syn-panel-border-color);
+  border-radius: var(--syn-panel-border-radius);
+  box-shadow: var(--syn-shadow-medium);
+}
+
 .settings-panel {
   display: grid;
   gap: var(--syn-spacing-medium);

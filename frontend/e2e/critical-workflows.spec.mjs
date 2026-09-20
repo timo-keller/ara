@@ -121,11 +121,20 @@ test('settings menu exposes notifications and preserves compact mode', async ({
   await settings.press('Enter');
   await expect(page.getByText('Compact mode')).toBeVisible();
   await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
+  const settingsMenu = page.locator('app-settings syn-dropdown [part="panel"]');
+  await expect(settingsMenu).toBeVisible();
+  expect(await settingsMenu.evaluate((node) => getComputedStyle(node).backgroundColor)).toMatch(
+    /^rgb\(\d+, \d+, \d+\)$/,
+  );
 
   await page.locator('syn-switch').locator('[part="control"]').click();
   await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
   await expect(page.locator('syn-switch')).toHaveAttribute('size', 'small');
   await expect(settings).not.toHaveAttribute('size');
+  await expect(settingsMenu).toBeVisible();
+  expect(await settingsMenu.evaluate((node) => getComputedStyle(node).backgroundColor)).toMatch(
+    /^rgb\(\d+, \d+, \d+\)$/,
+  );
   await page.goto(`${baseURL()}/assets`);
   await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
   await expect(page.locator('syn-input[label="Search assets"]')).toHaveAttribute('size', 'small');
