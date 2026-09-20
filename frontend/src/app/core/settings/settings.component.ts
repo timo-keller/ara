@@ -6,6 +6,7 @@ import { SynIconComponent } from '@synergy-design-system/angular/components/icon
 import { SynSwitchComponent } from '@synergy-design-system/angular/components/switch';
 import { NotificationComponent } from '../notifications/notification.component';
 import { NotificationService } from '../notifications/notification.service';
+import { AuthService } from '../auth/auth.service';
 import { CompactModeService } from './compact-mode.service';
 
 @Component({
@@ -22,8 +23,13 @@ import { CompactModeService } from './compact-mode.service';
   styleUrl: './settings.component.scss',
 })
 export class SettingsComponent {
+  readonly auth = inject(AuthService);
   readonly compactMode = inject(CompactModeService);
   readonly notifications = inject(NotificationService);
+
+  accountName(): string | null {
+    return this.auth.user()?.display_name || this.auth.user()?.email || null;
+  }
 
   accessibleLabel(): string {
     const unreadCount = this.notifications.unreadCount();

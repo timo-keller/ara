@@ -60,10 +60,12 @@ describe('App', () => {
       'nav[aria-label="Account"]',
     ) as HTMLElement;
     expect(Array.from(accountNavigation.children).map((child) => child.tagName)).toEqual([
-      'SPAN',
       'APP-SETTINGS',
     ]);
-    expect(accountNavigation.querySelector('.account-name')?.textContent?.trim()).toBe('Ada');
+    expect(accountNavigation.querySelector('.account-name')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.settings-account-name')?.textContent?.trim()).toBe(
+      'Ada',
+    );
     expect(fixture.nativeElement.textContent).not.toContain('Effective roles');
     expect(fixture.nativeElement.querySelector('.effective-roles')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('Home');

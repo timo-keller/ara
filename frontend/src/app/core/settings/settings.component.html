@@ -13,6 +13,9 @@
     }
   </syn-button>
   <section class="settings-panel" aria-label="Settings">
+    @if (accountName(); as accountName) {
+      <p class="settings-account-name">{{ accountName }}</p>
+    }
     <syn-switch [checked]="compactMode.compact()" (checkedChange)="compactMode.setCompact($event)">
       Compact mode
     </syn-switch>

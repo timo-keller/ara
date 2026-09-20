@@ -138,26 +138,10 @@ test('settings menu exposes notifications and preserves compact mode', async ({
   await login(context, page, 'alpha-user');
 
   const settings = page.getByRole('button', { name: 'Settings' });
-  const accountName = page.locator('.account-name');
-  const applicationName = page.locator('syn-header [part="content"] > [part="label"]');
-  await expect(accountName).toHaveText('alpha-user');
-  const [accountBox, applicationBox, settingsBox] = await Promise.all([
-    accountName.boundingBox(),
-    applicationName.boundingBox(),
-    settings.boundingBox(),
-  ]);
-  expect(accountBox).not.toBeNull();
-  expect(applicationBox).not.toBeNull();
-  expect(settingsBox).not.toBeNull();
-  expect(accountBox.x + accountBox.width).toBeLessThan(settingsBox.x);
-  expect(
-    Math.abs(accountBox.y + accountBox.height / 2 - (applicationBox.y + applicationBox.height / 2)),
-  ).toBeLessThanOrEqual(1);
-  expect(
-    Math.abs(accountBox.y + accountBox.height / 2 - (settingsBox.y + settingsBox.height / 2)),
-  ).toBeLessThanOrEqual(1);
+  await expect(page.locator('.account-name')).toHaveCount(0);
   await settings.focus();
   await settings.press('Enter');
+  await expect(page.locator('.settings-account-name')).toHaveText('alpha-user');
   await expect(page.getByText('Compact mode')).toBeVisible();
   await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
   const settingsMenu = page.locator('app-settings syn-dropdown [part="panel"]');

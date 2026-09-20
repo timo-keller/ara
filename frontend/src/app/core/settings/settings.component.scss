@@ -11,3 +11,8 @@ syn-dropdown::part(panel) {
   min-width: 20rem;
   padding: var(--syn-spacing-medium);
 }
+
+.settings-account-name {
+  font: var(--syn-body-small);
+  margin: 0;
+}
