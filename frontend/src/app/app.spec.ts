@@ -38,7 +38,7 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('renders the Synergy rail shell and owner navigation from effective roles', () => {
+  it('omits effective roles diagnostics while retaining owner navigation', () => {
     const headerElement = customElements.get('syn-header') as unknown as {
       prototype: HeaderElement;
     };
@@ -64,7 +64,8 @@ describe('App', () => {
       'APP-SETTINGS',
     ]);
     expect(accountNavigation.querySelector('.account-name')?.textContent?.trim()).toBe('Ada');
-    expect(fixture.nativeElement.textContent).toContain('Effective roles: Owner');
+    expect(fixture.nativeElement.textContent).not.toContain('Effective roles');
+    expect(fixture.nativeElement.querySelector('.effective-roles')).toBeNull();
     expect(fixture.nativeElement.textContent).toContain('Administration');
     expect(fixture.nativeElement.textContent).toContain('Audit history');
     const navigationIconName = (label: string) => {

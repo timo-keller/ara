@@ -71,15 +71,6 @@ export class App {
     return this.currentUrl().split('?')[0] === path;
   }
 
-  roleLabels(): string[] {
-    const roles = this.auth.roles();
-    if (!roles) return [];
-    const groupRoles = Object.entries(roles.group_roles).map(
-      ([groupId, role]) => `Group ${role} (${groupId})`,
-    );
-    return roles.is_owner ? ['Owner', ...groupRoles] : groupRoles;
-  }
-
   logout(event: Event): void {
     event.preventDefault();
     this.auth.logout().subscribe((result) => {
