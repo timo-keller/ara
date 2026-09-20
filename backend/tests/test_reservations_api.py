@@ -6,12 +6,13 @@ from pathlib import Path
 
 import pytest
 from asgi_client import ASGIClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ara.api.routers import auth as auth_router
 from ara.api.routers import groups as group_router
 from ara.core.errors import DomainError
-from ara.domain.models import Asset, Group, GroupRole, Reservation, User
+from ara.domain.models import Asset, AuditEvent, Group, GroupRole, Reservation, User
 from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
 from ara.services.authorization import EffectiveRoles
@@ -78,12 +79,6 @@ def test_reservation_api_creation_access_schedule_and_pagination(
     assert (
         client.post("/api/reservations", json={"asset_id": laptop}).status_code == 422
     )
-    past = client.post(
-        "/api/reservations",
-        json={"asset_id": laptop, "starts_at": "2020-01-01T00:00:00Z"},
-    )
-    assert past.status_code == 400
-    assert past.json()["error"]["code"] == "reservation_start_in_past"
     assert (
         client.post(
             "/api/reservations",
@@ -150,6 +145,48 @@ def test_reservation_api_creation_access_schedule_and_pagination(
     ).json()
     assert schedule["total"] == 1
     assert schedule["items"][0]["id"] == created.json()["id"]
+
+
+def test_reservation_api_clamps_a_past_start_and_audits_effective_interval(
+    reservation_api_client: ApiClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, factory, _, roles = reservation_api_client
+    lab, _, _, laptop, _ = _fixtures(factory)
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={uuid.UUID(lab): GroupRole.USER}
+    )
+    now = datetime(2030, 1, 2, 10, tzinfo=UTC)
+    monkeypatch.setattr("ara.services.reservations.utc_now", lambda: now)
+    ends_at = now + timedelta(hours=1)
+
+    created = client.post(
+        "/api/reservations",
+        json={
+            "asset_id": laptop,
+            "starts_at": "2020-01-01T00:00:00Z",
+            "ends_at": ends_at.isoformat().replace("+00:00", "Z"),
+        },
+    )
+
+    assert created.status_code == 201
+    assert datetime.fromisoformat(created.json()["starts_at"]) == now
+    assert datetime.fromisoformat(created.json()["ends_at"]) == ends_at
+
+    async def assert_persisted() -> None:
+        async with factory() as session:
+            reservation = await session.get(
+                Reservation, uuid.UUID(created.json()["id"])
+            )
+            assert reservation is not None
+            assert reservation.starts_at == now
+            assert reservation.ends_at == ends_at
+            event = await session.scalar(select(AuditEvent))
+            assert event is not None
+            assert event.after_state is not None
+            assert event.after_state["starts_at"] == now.isoformat()
+            assert event.after_state["ends_at"] == ends_at.isoformat()
+
+    asyncio.run(assert_persisted())
 
 
 def test_own_reservation_asset_names_follow_asset_visibility(
@@ -251,7 +288,7 @@ def test_reservation_lifecycle_api_routes(
 
 @pytest.mark.asyncio
 async def test_current_user_creation_checks_group_and_asset_inside_write_transaction(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
@@ -263,8 +300,13 @@ async def test_current_user_creation_checks_group_and_asset_inside_write_transac
         session.add_all([group, user])
         await session.flush()
         asset = Asset(group_id=group.id, name="Laptop", asset_type="computer")
-        session.add(asset)
+        just_before_asset = Asset(group_id=group.id, name="Phone", asset_type="phone")
+        open_ended_asset = Asset(group_id=group.id, name="Tablet", asset_type="tablet")
+        conflict_asset = Asset(group_id=group.id, name="Monitor", asset_type="monitor")
+        session.add_all([asset, just_before_asset, open_ended_asset, conflict_asset])
         await session.commit()
+        conflict_asset_id = conflict_asset.id
+        user_id = user.id
 
         # Simulate request authentication/role-resolution reads before service
         # entry. The service must end this implicit transaction before BEGIN
@@ -272,34 +314,80 @@ async def test_current_user_creation_checks_group_and_asset_inside_write_transac
         await session.get(Asset, asset.id)
         service = ReservationService(session)
         roles = EffectiveRoles(is_owner=False, group_roles={group.id: GroupRole.USER})
-        with pytest.raises(DomainError, match="now or in the future") as error:
-            await service.create_for_current_user(
-                roles,
-                asset_id=asset.id,
-                user_id=user.id,
-                starts_at=datetime(2020, 1, 1, tzinfo=UTC),
-                ends_at=None,
-            )
-        assert error.value.code == "reservation_start_in_past"
+        now = datetime(2030, 1, 2, 10, tzinfo=UTC)
+        monkeypatch.setattr("ara.services.reservations.utc_now", lambda: now)
 
-        immediate = datetime.now(UTC)
         reservation = await service.create_for_current_user(
             roles,
             asset_id=asset.id,
             user_id=user.id,
-            starts_at=immediate,
-            ends_at=immediate + timedelta(hours=1),
+            starts_at=now - timedelta(days=1),
+            ends_at=now + timedelta(hours=1),
         )
+        assert reservation.starts_at == now
+        assert reservation.ends_at == now + timedelta(hours=1)
         assert reservation.user_id == user.id
         assert await session.get(Reservation, reservation.id) is not None
+
+        just_before = await service.create_for_current_user(
+            roles,
+            asset_id=just_before_asset.id,
+            user_id=user.id,
+            starts_at=now - timedelta(microseconds=1),
+            ends_at=now + timedelta(hours=1),
+        )
+        assert just_before.starts_at == now
+
         future = await service.create_for_current_user(
             roles,
             asset_id=asset.id,
             user_id=user.id,
-            starts_at=immediate + timedelta(hours=1),
-            ends_at=immediate + timedelta(hours=2),
+            starts_at=now + timedelta(hours=1),
+            ends_at=now + timedelta(hours=2),
         )
-        assert future.starts_at == immediate + timedelta(hours=1)
+        assert future.starts_at == now + timedelta(hours=1)
+
+        open_ended = await service.create_for_current_user(
+            roles,
+            asset_id=open_ended_asset.id,
+            user_id=user.id,
+            starts_at=now - timedelta(days=1),
+            ends_at=None,
+        )
+        assert open_ended.starts_at == now
+        assert open_ended.ends_at is None
+
+        audit_count = await session.scalar(select(func.count()).select_from(AuditEvent))
+        with pytest.raises(DomainError) as error:
+            await service.create_for_current_user(
+                roles,
+                asset_id=conflict_asset_id,
+                user_id=user_id,
+                starts_at=now - timedelta(hours=1),
+                ends_at=now,
+            )
+        assert error.value.code == "reservation_invalid_interval"
+        assert await session.scalar(select(func.count()).select_from(Reservation)) == 4
+        assert (
+            await session.scalar(select(func.count()).select_from(AuditEvent))
+            == audit_count
+        )
+
+        await service.create(
+            asset_id=conflict_asset_id,
+            user_id=user_id,
+            starts_at=now,
+            ends_at=now + timedelta(hours=1),
+        )
+        with pytest.raises(DomainError) as error:
+            await service.create_for_current_user(
+                roles,
+                asset_id=conflict_asset_id,
+                user_id=user_id,
+                starts_at=now - timedelta(days=1),
+                ends_at=now + timedelta(hours=2),
+            )
+        assert error.value.code == "reservation_conflict"
     await engine.dispose()
 
 

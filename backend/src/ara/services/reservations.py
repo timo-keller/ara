@@ -1,7 +1,7 @@
 """Reservation interval business operations."""
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -96,9 +96,11 @@ class ReservationService:
     ) -> Reservation:
         """Create a current user's reservation with all checks in one write lock."""
         self._validate_interval(starts_at, ends_at)
-        self._validate_current_user_start(starts_at)
         await self._begin_immediate()
         try:
+            now = utc_now()
+            effective_starts_at = max(starts_at, now)
+            self._validate_interval(effective_starts_at, ends_at)
             user = await self.users.get_by_id(user_id)
             if user is None:
                 raise DomainError("user_not_found", "User not found", status_code=404)
@@ -107,12 +109,12 @@ class ReservationService:
             AuthorizationService.require_group_user(actor_roles, group.id)
             self._require_reservable(asset, group)
             await self.ensure_available(
-                asset_id=asset.id, starts_at=starts_at, ends_at=ends_at
+                asset_id=asset.id, starts_at=effective_starts_at, ends_at=ends_at
             )
             reservation = Reservation(
                 asset_id=asset.id,
                 user_id=user.id,
-                starts_at=starts_at,
+                starts_at=effective_starts_at,
                 ends_at=ends_at,
             )
             self.reservations.add(reservation)
@@ -454,19 +456,6 @@ class ReservationService:
         """
         if now > reservation.starts_at:
             reservation.ends_at = now
-
-    @staticmethod
-    def _validate_current_user_start(starts_at: datetime) -> None:
-        """Reject historical self-service reservations while allowing immediate use.
-
-        A short grace period accounts for a browser's current timestamp becoming
-        slightly stale while its request is in transit.
-        """
-        if starts_at < utc_now() - timedelta(minutes=1):
-            raise DomainError(
-                "reservation_start_in_past",
-                "starts_at must be now or in the future",
-            )
 
     async def _begin_immediate(self) -> None:
         """Start a SQLite write transaction without nesting request reads."""

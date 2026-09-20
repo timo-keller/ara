@@ -154,8 +154,10 @@ only when the referenced asset remains visible to that user; otherwise it is
 /api/assets/{asset_id}/reservations` lists an accessible asset's active schedule
 chronologically. Both lists use `offset` and `limit` pagination and a stable
 identifier tie-breaker. Creation rejects archived groups or assets and requires
-UTC timestamps (`Z` or `+00:00`). Self-service starts must be now or future;
-a one-minute grace period accommodates an immediate browser timestamp in transit.
+UTC timestamps (`Z` or `+00:00`). A self-service start in the past is clamped
+to the server's current UTC time after its write lock is acquired; bounded
+reservations retain their submitted end and must still have a positive effective
+interval.
 
 `POST /api/reservations/{id}/extend` extends the authenticated user's bounded
 active reservation to a strictly later UTC `ends_at`; the full revised interval
