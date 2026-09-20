@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ara.daos.audit import AuditDAO
+from ara.daos.audit import AuditDAO, AuditEventResult
 from ara.domain.models import (
     Asset,
     AuditEvent,
@@ -165,7 +165,7 @@ class AuditService:
         actor_roles: EffectiveRoles,
         *,
         group_id: uuid.UUID | None,
-        actor_id: uuid.UUID | None,
+        actor_id: str | None,
         action: list[AuditAction] | None,
         target_type: list[AuditTargetType] | None,
         target_id: str | None,
@@ -173,7 +173,7 @@ class AuditService:
         created_at_to: datetime | None,
         offset: int,
         limit: int,
-    ) -> tuple[list[AuditEvent], int]:
+    ) -> tuple[list[AuditEventResult], int]:
         """List audit history within the caller's administrative group scope."""
         self._validate_time_range(created_at_from, created_at_to)
         if actor_roles.is_owner:

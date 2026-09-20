@@ -15,7 +15,7 @@ class AuditQuerySchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     group_id: uuid.UUID | None = None
-    actor_id: uuid.UUID | None = None
+    actor_id: str | None = None
     action: list[AuditAction] | None = None
     target_type: list[AuditTargetType] | None = None
     target_id: str | None = None
@@ -48,10 +48,12 @@ class AuditEventSchema(BaseModel):
 
     id: uuid.UUID
     actor_id: uuid.UUID | None
+    actor_name: str | None = None
     group_id: uuid.UUID | None
     action: str
     target_type: str
     target_id: str
+    target_name: str | None = None
     before_state: dict[str, Any] | None
     after_state: dict[str, Any] | None
     correlation_id: str | None

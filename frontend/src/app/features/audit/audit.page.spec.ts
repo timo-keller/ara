@@ -50,7 +50,7 @@ describe('AuditPage', () => {
   it('round-trips URL filters and renders newest-first API results safely', async () => {
     const router = TestBed.inject(Router);
     await router.navigateByUrl(
-      '/audit?group_id=group-a&action=asset.update&action=asset.archive&target_type=asset&target_type=group&created_at_from=2026-01-01T12:30:00.000Z&offset=25&limit=50',
+      '/audit?group_id=group-a&actor_id=Ada&target_id=New%20asset&action=asset.update&action=asset.archive&target_type=asset&target_type=group&created_at_from=2026-01-01T12:30:00.000Z&offset=25&limit=50',
     );
     const fixture = TestBed.createComponent(AuditPage);
     fixture.detectChanges();
@@ -58,7 +58,7 @@ describe('AuditPage', () => {
       .expectOne('/api/groups?archived=false&limit=100')
       .flush({ items: [{ id: 'group-a', name: 'A' }] });
     const request = http.expectOne(
-      '/api/audit-events?offset=25&limit=50&group_id=group-a&created_at_from=2026-01-01T12:30:00.000Z&action=asset.update&action=asset.archive&target_type=asset&target_type=group',
+      '/api/audit-events?offset=25&limit=50&group_id=group-a&actor_id=Ada&target_id=New%20asset&created_at_from=2026-01-01T12:30:00.000Z&action=asset.update&action=asset.archive&target_type=asset&target_type=group',
     );
     request.flush({
       total: 2,
@@ -68,10 +68,12 @@ describe('AuditPage', () => {
         {
           id: 'new',
           actor_id: 'actor',
+          actor_name: 'Ada',
           group_id: 'group-a',
           action: 'asset.update',
           target_type: 'asset',
           target_id: 'new',
+          target_name: 'New asset',
           before_state: null,
           after_state: { name: 'New' },
           correlation_id: null,
@@ -80,10 +82,12 @@ describe('AuditPage', () => {
         {
           id: 'old',
           actor_id: null,
+          actor_name: null,
           group_id: 'group-a',
           action: 'asset.update',
           target_type: 'asset',
           target_id: 'old',
+          target_name: null,
           before_state: null,
           after_state: null,
           correlation_id: null,
@@ -101,6 +105,10 @@ describe('AuditPage', () => {
     const fromControl = fixture.nativeElement.querySelector('syn-input[type="datetime-local"]');
     expect(fromControl.value).toBe(utcIsoToLocalDatetimeInput('2026-01-01T12:30:00.000Z'));
     expect(fixture.nativeElement.querySelectorAll('syn-combobox syn-option')).toHaveLength(21);
+    expect(fixture.nativeElement.textContent).toContain('Ada (actor)');
+    expect(fixture.nativeElement.textContent).toContain('New asset (new)');
+    expect(fixture.nativeElement.textContent).toContain('Unavailable historical entity (old)');
+    expect(fixture.nativeElement.textContent).toContain('Search name or UUID.');
   });
 
   it('accepts a single legacy audit selection and serializes multiple selections repeatedly', () => {

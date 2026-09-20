@@ -17,11 +17,11 @@
       }
     </syn-select>
     <syn-input
-      label="Actor ID"
+      label="Actor"
       [value]="filters().actorId"
       (valueChange)="changeFilter('actorId', $event)"
     >
-      <span slot="help-text"><strong>Optional</strong></span>
+      <span slot="help-text"><strong>Optional.</strong> Search name or UUID.</span>
     </syn-input>
     <syn-combobox
       label="Action"
@@ -50,11 +50,11 @@
       }
     </syn-combobox>
     <syn-input
-      label="Target ID"
+      label="Target"
       [value]="filters().targetId"
       (valueChange)="changeFilter('targetId', $event)"
     >
-      <span slot="help-text"><strong>Optional</strong></span>
+      <span slot="help-text"><strong>Optional.</strong> Search name or UUID.</span>
     </syn-input>
     <syn-input
       type="datetime-local"
@@ -98,9 +98,11 @@
             <dt>Group</dt>
             <dd>{{ groupName(event.group_id) }}</dd>
             <dt>Actor</dt>
-            <dd>{{ event.actor_id || 'System' }}</dd>
+            <dd>{{ entityName(event.actor_name, event.actor_id) }}</dd>
             <dt>Target</dt>
-            <dd>{{ event.target_id }}</dd>
+            <dd>
+              {{ entityName(event.target_name, event.target_id, 'Unavailable historical entity') }}
+            </dd>
           </dl>
           <syn-details summary="View change details" contained
             ><div class="states">

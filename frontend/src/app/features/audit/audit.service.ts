@@ -16,10 +16,12 @@ export interface AuditFilters {
 export interface AuditEvent {
   id: string;
   actor_id: string | null;
+  actor_name: string | null;
   group_id: string | null;
   action: string;
   target_type: string;
   target_id: string;
+  target_name: string | null;
   before_state: Record<string, unknown> | null;
   after_state: Record<string, unknown> | null;
   correlation_id: string | null;

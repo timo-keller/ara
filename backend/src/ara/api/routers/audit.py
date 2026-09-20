@@ -16,13 +16,18 @@ from ara.api.schemas.audit import (
     AuditEventSchema,
     AuditQuerySchema,
 )
+from ara.daos.audit import AuditEventResult
 from ara.infrastructure.database import get_session
 from ara.services.audit import AuditAction, AuditService, AuditTargetType
 from ara.services.authorization import EffectiveRoles
 
 
-def _event_schema(event: object) -> AuditEventSchema:
-    return AuditEventSchema.model_validate(event, from_attributes=True)
+def _event_schema(result: AuditEventResult) -> AuditEventSchema:
+    return AuditEventSchema.model_validate(
+        result.event, from_attributes=True
+    ).model_copy(
+        update={"actor_name": result.actor_name, "target_name": result.target_name}
+    )
 
 
 @api_router.get("/audit-events", response_model=AuditEventListSchema)
@@ -30,7 +35,7 @@ async def list_audit_events(
     roles: Annotated[EffectiveRoles, Depends(get_effective_roles)],
     session: Annotated[AsyncSession, Depends(get_session)],
     group_id: Annotated[uuid.UUID | None, Query()] = None,
-    actor_id: Annotated[uuid.UUID | None, Query()] = None,
+    actor_id: Annotated[str | None, Query()] = None,
     action: Annotated[list[AuditAction] | None, Query()] = None,
     target_type: Annotated[list[AuditTargetType] | None, Query()] = None,
     target_id: Annotated[str | None, Query()] = None,

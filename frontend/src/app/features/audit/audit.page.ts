@@ -217,6 +217,10 @@ export class AuditPage {
   groupName(groupId: string | null): string {
     return this.groups().find((group) => group.id === groupId)?.name ?? (groupId || 'No group');
   }
+  entityName(name: string | null, id: string | null, systemLabel = 'System'): string {
+    if (!id) return systemLabel;
+    return name ? `${name} (${id})` : `Unavailable historical entity (${id})`;
+  }
   stateJson(value: Record<string, unknown> | null): string {
     return safeAuditJson(value);
   }

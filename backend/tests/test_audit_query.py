@@ -11,7 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from ara.api.routers import auth as auth_router
 from ara.api.routers import groups as group_router
 from ara.core.errors import DomainError
-from ara.domain.models import AuditEvent, Group, GroupRole, User
+from ara.domain.models import (
+    Asset,
+    AuditEvent,
+    Group,
+    GroupRole,
+    Reservation,
+    RoleMapping,
+    User,
+)
 from ara.infrastructure.database import Base, create_engine, create_session_factory
 from ara.main import create_app
 from ara.services.audit import AUDIT_ACTIONS, AUDIT_TARGET_TYPES, AuditService
@@ -297,3 +305,145 @@ async def test_audit_service_denies_users_and_scopes_target_filters(
                 offset=0,
                 limit=50,
             )
+
+
+async def test_audit_query_enriches_names_searches_names_or_ids_and_preserves_scope(
+    audit_api_client: ApiClient,
+) -> None:
+    client, factory, roles, seeded = audit_api_client
+    group_a = seeded["group_a"]
+    group_b = seeded["group_b"]
+    actor_a = seeded["actor_a"]
+    assert isinstance(group_a, uuid.UUID)
+    assert isinstance(group_b, uuid.UUID)
+    assert isinstance(actor_a, uuid.UUID)
+    async with factory() as session:
+        alice = await session.get(User, actor_a)
+        assert alice is not None
+        alice.display_name = "Alice Auditor"
+        secret_actor = User(
+            oidc_issuer="https://issuer.example",
+            oidc_subject="secret",
+            display_name="Secret Actor",
+        )
+        asset = Asset(group_id=group_a, asset_type="laptop", name="Named asset")
+        private_asset = Asset(
+            group_id=group_b, asset_type="laptop", name="Private target"
+        )
+        session.add_all([secret_actor, asset, private_asset])
+        await session.flush()
+        reservation = Reservation(
+            asset_id=asset.id, user_id=actor_a, starts_at=datetime.now(UTC)
+        )
+        mapping = RoleMapping(
+            group_id=group_a, expression="department == 'lab'", role=GroupRole.USER
+        )
+        session.add_all([reservation, mapping])
+        await session.flush()
+        session.add_all(
+            [
+                AuditEvent(
+                    group_id=group_a,
+                    actor_id=actor_a,
+                    action="asset.create",
+                    target_type="asset",
+                    target_id=str(asset.id),
+                ),
+                AuditEvent(
+                    group_id=group_a,
+                    actor_id=actor_a,
+                    action="group.update",
+                    target_type="group",
+                    target_id=str(group_a),
+                ),
+                AuditEvent(
+                    group_id=group_a,
+                    actor_id=actor_a,
+                    action="reservation.create",
+                    target_type="reservation",
+                    target_id=str(reservation.id),
+                ),
+                AuditEvent(
+                    group_id=group_a,
+                    actor_id=actor_a,
+                    action="role_mapping.create",
+                    target_type="role_mapping",
+                    target_id=str(mapping.id),
+                ),
+                AuditEvent(
+                    group_id=group_b,
+                    actor_id=secret_actor.id,
+                    action="asset.create",
+                    target_type="asset",
+                    target_id=str(private_asset.id),
+                ),
+                AuditEvent(
+                    group_id=group_a,
+                    action="asset.create",
+                    target_type="asset",
+                    target_id=str(uuid.uuid4()),
+                ),
+            ]
+        )
+        await session.commit()
+
+    named = await client._client.get(
+        "/api/audit-events", params={"target_id": "NAMED ass"}
+    )
+    assert named.status_code == 200
+    assert named.json()["total"] == 2
+    assert {item["target_name"] for item in named.json()["items"]} == {
+        "Named asset",
+        "Reservation for Named asset",
+    }
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"target_id": "reservation for named"}
+        )
+    ).json()["total"] == 1
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"target_id": "department =="}
+        )
+    ).json()["total"] == 1
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"actor_id": "alice audit"}
+        )
+    ).json()["total"] == 7
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"actor_id": str(actor_a)[:8]}
+        )
+    ).json()["total"] == 7
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"target_id": str(asset.id)[:8]}
+        )
+    ).json()["total"] == 1
+
+    items = (await client._client.get("/api/audit-events")).json()["items"]
+    target_names = {item["target_name"] for item in items}
+    assert {
+        "Named asset",
+        "A",
+        "Reservation for Named asset",
+        "Role mapping: department == 'lab'",
+    } <= target_names
+    missing = next(item for item in items if item["actor_id"] is None)
+    assert missing["actor_name"] is None
+    assert missing["target_name"] is None
+
+    roles["value"] = EffectiveRoles(
+        is_owner=False, group_roles={group_a: GroupRole.GROUP_ADMIN}
+    )
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"target_id": "private target"}
+        )
+    ).json()["total"] == 0
+    assert (
+        await client._client.get(
+            "/api/audit-events", params={"actor_id": "secret actor"}
+        )
+    ).json()["total"] == 0
