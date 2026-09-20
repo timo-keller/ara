@@ -10,7 +10,9 @@ const COMPACT_SIZED_SELECTOR = [
   'syn-pagination',
   'syn-switch',
   'syn-textarea',
-].join(', ');
+]
+  .map((selector) => `${selector}:not([size]):not([data-compact-mode-exempt])`)
+  .join(', ');
 
 @Injectable({ providedIn: 'root' })
 export class CompactModeService {
@@ -30,12 +32,10 @@ export class CompactModeService {
     if (!shell) return;
 
     if (this.compact()) {
-      shell
-        .querySelectorAll<HTMLElement>(`${COMPACT_SIZED_SELECTOR}:not([size])`)
-        .forEach((element) => {
-          element.setAttribute('size', 'small');
-          element.dataset['compactModeSized'] = '';
-        });
+      shell.querySelectorAll<HTMLElement>(COMPACT_SIZED_SELECTOR).forEach((element) => {
+        element.setAttribute('size', 'small');
+        element.dataset['compactModeSized'] = '';
+      });
       return;
     }
 

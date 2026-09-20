@@ -91,7 +91,8 @@ test('settings menu exposes notifications and preserves compact mode', async ({
   await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
   await page.reload();
   await expect(page.locator('syn-switch')).toHaveAttribute('checked', '');
-  await expect(page.locator('syn-button').first()).toHaveAttribute('size', 'small');
+  await expect(settings).not.toHaveAttribute('size');
+  await expect(page.locator('syn-switch')).toHaveAttribute('size', 'small');
 });
 
 test('group admin is scoped in the UI, API, and audit history while a user is denied', async ({
