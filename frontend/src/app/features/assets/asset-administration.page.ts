@@ -61,6 +61,8 @@ export class AssetAdministrationPage {
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   readonly error = signal<string | null>(null);
   readonly draft = signal<AssetDraft>(emptyDraft());
+  readonly nameFilter = signal('');
+  readonly assetTypeFilter = signal('');
   readonly manageableGroups = computed(() => {
     const roles = this.auth.roles();
     if (roles?.is_owner) return this.groups();
@@ -81,6 +83,32 @@ export class AssetAdministrationPage {
       if (type && !suggestions.has(key)) suggestions.set(key, type);
     }
     return [...suggestions.values()];
+  });
+  readonly assetTypeFilterOptions = computed(() => {
+    const options = new Map<string, string>();
+    for (const asset of this.manageableAssets()) {
+      const type = this.normalizeAssetType(asset.asset_type);
+      const key = type.toLowerCase();
+      if (type && !options.has(key)) options.set(key, type);
+    }
+    return [...options.values()];
+  });
+  readonly filteredManageableAssets = computed(() => {
+    const name = this.nameFilter().trim().toLowerCase();
+    const type = this.assetTypeFilter().trim().toLowerCase();
+    return this.manageableAssets().filter(
+      (asset) =>
+        (!name || asset.name.toLowerCase().includes(name)) &&
+        (!type || this.normalizeAssetType(asset.asset_type).toLowerCase() === type),
+    );
+  });
+  readonly selectedAssetIsFilteredOut = computed(() => {
+    const selectedId = this.draft().id;
+    return (
+      !!selectedId &&
+      (!!this.nameFilter().trim() || !!this.assetTypeFilter().trim()) &&
+      !this.filteredManageableAssets().some((asset) => asset.id === selectedId)
+    );
   });
   readonly webexRoomIdSuggestions = computed(() => {
     const groupId = this.draft().group_id;
@@ -136,6 +164,14 @@ export class AssetAdministrationPage {
 
   changeAssetType(value: string | number | (string | number)[]): void {
     this.change('asset_type', Array.isArray(value) ? String(value[0] ?? '') : String(value));
+  }
+
+  changeNameFilter(value: string): void {
+    this.nameFilter.set(value);
+  }
+
+  changeAssetTypeFilter(value: string | number | (string | number)[]): void {
+    this.assetTypeFilter.set(Array.isArray(value) ? String(value[0] ?? '') : String(value));
   }
 
   changeWebexRoomId(value: string | number | (string | number)[]): void {

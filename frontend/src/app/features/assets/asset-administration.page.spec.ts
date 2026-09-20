@@ -194,6 +194,81 @@ describe('AssetAdministrationPage', () => {
     expect(fixture.nativeElement.querySelector('syn-combobox')).not.toBeNull();
   });
 
+  it('offers unique filter types only from manageable assets, including archived assets', () => {
+    setRoles(false, { 'group-admin': 'group_admin', 'group-user': 'user' });
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.assets.set([
+      { ...activeAsset, asset_type: ' Laptop ' },
+      {
+        ...activeAsset,
+        id: 'asset-archived-type',
+        asset_type: 'Test   bench',
+        archived_at: '2026-01-01',
+      },
+      { ...activeAsset, id: 'asset-duplicate', asset_type: 'laptop' },
+      { ...activeAsset, id: 'asset-user', group_id: 'group-user', asset_type: 'Camera' },
+      { ...activeAsset, id: 'asset-other', group_id: 'group-other', asset_type: 'Server' },
+    ]);
+
+    expect(page.assetTypeFilterOptions()).toEqual(['Laptop', 'Test bench']);
+    fixture.detectChanges();
+    const typeFilter = fixture.nativeElement.querySelector(
+      'syn-select[label="Filter by asset type"]',
+    ) as HTMLElement;
+    expect(typeFilter).not.toBeNull();
+    expect(typeFilter.hasAttribute('clearable')).toBe(true);
+    expect(typeFilter.textContent).not.toContain('Camera');
+    expect(typeFilter.textContent).not.toContain('Server');
+  });
+
+  it('combines and clears name and type filters while retaining archived assets', () => {
+    setRoles(true, {});
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.assets.set([
+      activeAsset,
+      { ...activeAsset, id: 'asset-camera', asset_type: 'Camera', name: 'Lab camera' },
+      {
+        ...activeAsset,
+        id: 'asset-old-camera',
+        asset_type: 'Camera',
+        name: 'Old camera',
+        archived_at: '2026-01-01',
+      },
+    ]);
+
+    page.changeNameFilter('old');
+    page.changeAssetTypeFilter('Camera');
+    expect(page.filteredManageableAssets().map((asset) => asset.id)).toEqual(['asset-old-camera']);
+    page.changeNameFilter('');
+    expect(page.filteredManageableAssets().map((asset) => asset.id)).toEqual([
+      'asset-camera',
+      'asset-old-camera',
+    ]);
+    page.changeAssetTypeFilter('');
+    expect(page.filteredManageableAssets()).toHaveLength(3);
+  });
+
+  it('retains an editor draft when filtering hides its selected asset without marking it selected', () => {
+    setRoles(true, {});
+    const fixture = createReadyPage();
+    const page = fixture.componentInstance;
+    page.edit(activeAsset);
+    page.changeNameFilter('not the build laptop');
+    fixture.detectChanges();
+
+    expect(page.draft().id).toBe('asset-active');
+    expect(page.selectedAssetIsFilteredOut()).toBe(true);
+    expect(fixture.nativeElement.querySelector('[aria-current="true"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Its editor draft is retained');
+
+    page.changeNameFilter('');
+    fixture.detectChanges();
+    expect(page.selectedAssetIsFilteredOut()).toBe(false);
+    expect(fixture.nativeElement.querySelector('[aria-current="true"]')).not.toBeNull();
+  });
+
   it('suggests unique non-empty Webex room identifiers for the selected manageable group', () => {
     setRoles(false, { 'group-admin': 'group_admin', 'group-user': 'user' });
     const fixture = createReadyPage();

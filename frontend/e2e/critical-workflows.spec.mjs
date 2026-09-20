@@ -171,6 +171,13 @@ test('asset administration provides a keyboard-selectable responsive master-deta
     'true',
   );
 
+  await setSynInput(page, 'Filter assets by name', 'return');
+  await expect(page.getByRole('button', { name: 'Edit Alpha Laptop' })).toHaveCount(0);
+  await expect(page.locator('.asset-list-item[aria-current="true"]')).toHaveCount(0);
+  await expect(page.getByText('Its editor draft is retained')).toBeVisible();
+  await setSynInput(page, 'Filter assets by name', '');
+  await expect(page.getByRole('button', { name: 'Edit Alpha Laptop, selected' })).toHaveCount(1);
+
   await page.getByRole('button', { name: 'Create asset', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create asset' }).last()).toBeVisible();
   await expect(page.locator('.asset-list-item[aria-current="true"]')).toHaveCount(0);

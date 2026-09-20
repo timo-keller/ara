@@ -15,6 +15,24 @@
         <h2 id="managed-assets-heading">Managed assets</h2>
         <syn-button type="button" variant="filled" (click)="createAsset()">Create asset</syn-button>
       </div>
+      <div class="asset-filters">
+        <syn-input
+          label="Filter assets by name"
+          [value]="nameFilter()"
+          (valueChange)="changeNameFilter($event)"
+        ></syn-input>
+        <syn-select
+          label="Filter by asset type"
+          clearable
+          help-text="Choose from types used by assets you may manage, including archived assets. Clear to show every type."
+          [value]="assetTypeFilter()"
+          (valueChange)="changeAssetTypeFilter($event)"
+        >
+          @for (type of assetTypeFilterOptions(); track type) {
+            <syn-option [value]="type">{{ type }}</syn-option>
+          }
+        </syn-select>
+      </div>
 
       @if (state() === 'loading') {
         <p class="state" aria-live="polite"><syn-spinner></syn-spinner> Loading assets…</p>
@@ -25,9 +43,11 @@
         >
       } @else if (!manageableAssets().length) {
         <p class="state" aria-live="polite">No assets are available to administer.</p>
+      } @else if (!filteredManageableAssets().length) {
+        <p class="state" aria-live="polite">No managed assets match the current filters.</p>
       } @else {
         <div class="asset-list" role="list">
-          @for (asset of manageableAssets(); track asset.id) {
+          @for (asset of filteredManageableAssets(); track asset.id) {
             <div role="listitem">
               <button
                 type="button"
@@ -56,6 +76,11 @@
       <h2 slot="header">{{ draft().id ? 'Edit asset' : 'Create asset' }}</h2>
       @if (draft().id) {
         <p class="selected-asset" aria-live="polite">Editing {{ draft().name }}</p>
+        @if (selectedAssetIsFilteredOut()) {
+          <p class="selected-asset-filtered" aria-live="polite">
+            This asset is hidden by the current filters. Its editor draft is retained.
+          </p>
+        }
       }
       <form (submit)="$event.preventDefault(); save()">
         @if (!draft().id) {

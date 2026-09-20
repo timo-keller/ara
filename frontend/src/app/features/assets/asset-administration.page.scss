@@ -20,6 +20,12 @@ syn-card {
 .list-heading h2 {
   margin: 0;
 }
+.asset-filters {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
 form {
   display: flex;
   flex-direction: column;
@@ -64,9 +70,15 @@ form {
 .selected-asset {
   font-weight: 600;
 }
+.selected-asset-filtered {
+  margin: 0 0 0.75rem;
+}
 
 @media (max-width: 48rem) {
   .asset-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .asset-filters {
     grid-template-columns: minmax(0, 1fr);
   }
 }
