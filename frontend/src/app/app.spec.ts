@@ -67,6 +67,20 @@ describe('App', () => {
     expect(fixture.nativeElement.textContent).toContain('Effective roles: Owner');
     expect(fixture.nativeElement.textContent).toContain('Administration');
     expect(fixture.nativeElement.textContent).toContain('Audit history');
+    const navigationIconName = (label: string) => {
+      const navigationItems = fixture.nativeElement.querySelectorAll(
+        'syn-nav-item',
+      ) as NodeListOf<HTMLElement>;
+      const item = Array.from(navigationItems).find(
+        (element) => element.textContent?.trim() === label,
+      );
+      return item?.querySelector('syn-icon')?.getAttribute('name');
+    };
+    const assetsIcon = navigationIconName('Assets');
+    const manageAssetsIcon = navigationIconName('Manage assets');
+    expect(assetsIcon).toBe('inventory');
+    expect(manageAssetsIcon).toBe('admin_panel_settings');
+    expect(assetsIcon).not.toBe(manageAssetsIcon);
     TestBed.inject(NotificationService).notifications.set([
       {
         id: 'one',
