@@ -41,7 +41,7 @@ target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "UP", "ANN"]
 
 [tool.ty.environment]
 python-version = "3.14"

@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
@@ -23,8 +24,8 @@ from ara.services.reservations import ReservationService
 
 @pytest.fixture
 async def reservation_database(
-    tmp_path,
-) -> AsyncIterator[tuple[async_sessionmaker[AsyncSession], uuid.UUID, uuid.UUID]]:  # type: ignore[no-untyped-def]
+    tmp_path: Path,
+) -> AsyncIterator[tuple[async_sessionmaker[AsyncSession], uuid.UUID, uuid.UUID]]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
     async with engine.begin() as connection:

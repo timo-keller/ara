@@ -2,6 +2,7 @@ import json
 import logging
 import uuid
 
+import pytest
 from fastapi import Query
 from httpx import ASGITransport, AsyncClient
 
@@ -32,7 +33,9 @@ async def test_routes_are_mounted_and_responses_have_correlation_ids() -> None:
         )
 
 
-async def test_liveness_does_not_require_a_database(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+async def test_liveness_does_not_require_a_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def unavailable_engine() -> None:
         raise AssertionError("liveness must not access the database")
 
@@ -48,8 +51,8 @@ async def test_liveness_does_not_require_a_database(monkeypatch) -> None:  # typ
 
 
 async def test_readiness_returns_service_unavailable_when_database_is_unavailable(
-    monkeypatch,
-) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class UnavailableHealthService:
         async def is_ready(self) -> bool:
             return False
@@ -102,7 +105,9 @@ async def test_validation_and_domain_errors_use_safe_consistent_responses() -> N
     }
 
 
-async def test_request_logs_exclude_sensitive_headers_and_settings(caplog) -> None:  # type: ignore[no-untyped-def]
+async def test_request_logs_exclude_sensitive_headers_and_settings(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     caplog.set_level(logging.INFO, logger="ara.request")
     secret = "very-secret-value"
 

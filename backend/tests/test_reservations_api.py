@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from asgi_client import ASGIClient
@@ -25,7 +26,7 @@ ApiClient = tuple[
 
 
 @pytest.fixture
-def reservation_api_client(tmp_path) -> Iterator[ApiClient]:  # type: ignore[no-untyped-def]
+def reservation_api_client(tmp_path: Path) -> Iterator[ApiClient]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
 
@@ -204,8 +205,8 @@ def test_reservation_lifecycle_api_routes(
 
 @pytest.mark.asyncio
 async def test_current_user_creation_checks_group_and_asset_inside_write_transaction(
-    tmp_path,
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path,
+) -> None:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
     async with engine.begin() as connection:

@@ -26,6 +26,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import Enum as SqlEnum
+from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ara.infrastructure.database import Base
@@ -46,7 +47,7 @@ class UTCDateTimeType(TypeDecorator[datetime]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: datetime | None, dialect: Any
+        self, value: datetime | None, dialect: Dialect
     ) -> datetime | None:
         """Reject ambiguous values and normalize offsets before storage."""
         if value is None:
@@ -56,7 +57,7 @@ class UTCDateTimeType(TypeDecorator[datetime]):
         return value.astimezone(UTC)
 
     def process_result_value(
-        self, value: datetime | None, dialect: Any
+        self, value: datetime | None, dialect: Dialect
     ) -> datetime | None:
         """Restore SQLite's timezone-less datetime representation as UTC."""
         if value is None:

@@ -1,7 +1,6 @@
 """Asset catalogue business operations."""
 
 import uuid
-from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +31,7 @@ class AssetService:
         self.audit = AuditService(session, audit_context)
 
     async def create(
-        self, actor_roles: EffectiveRoles, *, group_id: uuid.UUID, **values: Any
+        self, actor_roles: EffectiveRoles, *, group_id: uuid.UUID, **values: object
     ) -> Asset:
         group = await self._get_group_required(group_id)
         AuthorizationService.require_group_admin(actor_roles, group.id)
@@ -103,7 +102,7 @@ class AssetService:
         return asset
 
     async def update(
-        self, actor_roles: EffectiveRoles, asset_id: uuid.UUID, **values: Any
+        self, actor_roles: EffectiveRoles, asset_id: uuid.UUID, **values: object
     ) -> Asset:
         asset = await self._get_required(asset_id)
         AuthorizationService.require_group_admin(actor_roles, asset.group_id)

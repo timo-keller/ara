@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,7 @@ from ara.services.role_mappings import RoleMappingService
 
 
 @pytest.fixture
-async def database_session(tmp_path: Path):  # type: ignore[no-untyped-def]
+async def database_session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)

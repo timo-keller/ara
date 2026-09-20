@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
+from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -110,7 +111,9 @@ def load_environment(
 class _EnvironmentSource(PydanticBaseSettingsSource):
     """Pydantic settings source with Docker-secret file support."""
 
-    def get_field_value(self, field: Any, field_name: str) -> tuple[Any, str, bool]:
+    def get_field_value(
+        self, field: FieldInfo, field_name: str
+    ) -> tuple[object, str, bool]:
         """Implement the source protocol; values are collected in ``__call__``."""
         return None, field_name, False
 
@@ -142,7 +145,7 @@ class Settings(BaseSettings):
 
     @field_validator("oidc_scopes", mode="before")
     @classmethod
-    def split_oidc_scopes(cls, value: Any) -> Any:
+    def split_oidc_scopes(cls, value: object) -> object:
         """Accept the conventional space-separated OIDC scope environment value."""
         if isinstance(value, str):
             return tuple(scope for scope in value.replace(",", " ").split() if scope)
@@ -150,7 +153,7 @@ class Settings(BaseSettings):
 
     @field_validator("notification_reminder_offsets_minutes", mode="before")
     @classmethod
-    def split_reminder_offsets(cls, value: Any) -> Any:
+    def split_reminder_offsets(cls, value: object) -> object:
         """Accept comma- or whitespace-separated, non-negative minute offsets."""
         if isinstance(value, str):
             values = tuple(int(offset) for offset in value.replace(",", " ").split())

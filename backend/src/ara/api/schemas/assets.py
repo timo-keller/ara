@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 
 from pydantic import (
     BaseModel,
@@ -45,19 +45,22 @@ def _reject_credentials(value: object) -> object:
     return value
 
 
-def _safe_metadata(value: Any) -> Any:
+def _safe_metadata[T](value: T) -> T:
     """Drop legacy credential-like metadata before it reaches an API response."""
     if isinstance(value, dict):
-        return {
-            key: _safe_metadata(nested_value)
-            for key, nested_value in value.items()
-            if not any(
-                part in str(key).lower().replace("-", "_")
-                for part in _CREDENTIAL_KEY_PARTS
-            )
-        }
+        return cast(
+            T,
+            {
+                key: _safe_metadata(nested_value)
+                for key, nested_value in value.items()
+                if not any(
+                    part in str(key).lower().replace("-", "_")
+                    for part in _CREDENTIAL_KEY_PARTS
+                )
+            },
+        )
     if isinstance(value, list):
-        return [_safe_metadata(nested_value) for nested_value in value]
+        return cast(T, [_safe_metadata(nested_value) for nested_value in value])
     return value
 
 

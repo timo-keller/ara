@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator, Callable
 from functools import lru_cache
+from sqlite3 import Connection
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import ConnectionPoolEntry
 
 from ara.core.config import get_settings
 
@@ -37,7 +39,9 @@ def _configure_sqlite(engine: Engine) -> None:
     """Configure every SQLite connection, including connections opened later."""
 
     @event.listens_for(engine, "connect")
-    def set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:  # type: ignore[no-untyped-def]
+    def set_sqlite_pragmas(
+        dbapi_connection: Connection, _connection_record: ConnectionPoolEntry
+    ) -> None:
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA foreign_keys=ON")

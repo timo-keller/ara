@@ -1,7 +1,8 @@
 import asyncio
 import uuid
-from collections.abc import AsyncIterator, Iterator, Mapping
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -73,8 +74,8 @@ AuthenticatedClient = tuple[ASGIClient, MockProvider, async_sessionmaker[AsyncSe
 
 
 @pytest.fixture
-def authenticated_client(  # type: ignore[no-untyped-def]
-    tmp_path, monkeypatch
+def authenticated_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[AuthenticatedClient]:
     configured_settings = settings()
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
@@ -97,7 +98,7 @@ def authenticated_client(  # type: ignore[no-untyped-def]
 
 def session_dependency(
     factory: async_sessionmaker[AsyncSession],
-) -> Any:
+) -> Callable[[], AsyncIterator[AsyncSession]]:
     async def get_test_session() -> AsyncIterator[AsyncSession]:
         async with factory() as session:
             yield session
@@ -167,7 +168,7 @@ def test_oidc_login_callback_session_and_logout(
 
 def test_callback_failure_is_safe_and_does_not_leak_provider_values(
     authenticated_client: AuthenticatedClient,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client, provider, _session_factory = authenticated_client
     login = client.get("/auth/login", follow_redirects=False)

@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from asgi_client import ASGIClient
@@ -27,7 +28,7 @@ from ara.services.groups import GroupService
 
 
 @pytest.fixture
-async def database_session(tmp_path) -> AsyncIterator[AsyncSession]:  # type: ignore[no-untyped-def]
+async def database_session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
@@ -100,7 +101,7 @@ ApiClient = tuple[
 
 
 @pytest.fixture
-def group_api_client(tmp_path) -> Iterator[ApiClient]:  # type: ignore[no-untyped-def]
+def group_api_client(tmp_path: Path) -> Iterator[ApiClient]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
 

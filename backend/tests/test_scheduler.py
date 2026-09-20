@@ -1,10 +1,12 @@
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import AuditEvent
 from ara.infrastructure.database import Base, create_engine, create_session_factory
@@ -57,13 +59,13 @@ async def test_lifespan_starts_and_stops_one_scheduler() -> None:
 
 @pytest.mark.asyncio
 async def test_jobs_can_run_directly_with_an_independent_session_and_log_results(
-    tmp_path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
     messages: list[str] = []
 
-    async def successful_job(session):  # type: ignore[no-untyped-def]
+    async def successful_job(session: AsyncSession) -> int | None:
         return await session.scalar(text("SELECT 1"))
 
     monkeypatch.setattr(
@@ -82,8 +84,8 @@ async def test_jobs_can_run_directly_with_an_independent_session_and_log_results
 
 @pytest.mark.asyncio
 async def test_audit_retention_logs_structured_cleanup_metrics(
-    tmp_path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
     messages: list[str] = []
@@ -121,17 +123,17 @@ async def test_audit_retention_logs_structured_cleanup_metrics(
 
 @pytest.mark.asyncio
 async def test_failed_job_is_logged_and_does_not_prevent_a_later_run(
-    tmp_path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
     messages: list[str] = []
 
-    async def failing_job(session):  # type: ignore[no-untyped-def]
+    async def failing_job(session: AsyncSession) -> None:
         await session.execute(text("SELECT 1"))
         raise RuntimeError("expected failure")
 
-    async def successful_job(session):  # type: ignore[no-untyped-def]
+    async def successful_job(session: AsyncSession) -> int | None:
         return await session.scalar(text("SELECT 2"))
 
     monkeypatch.setattr(

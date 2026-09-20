@@ -1,7 +1,7 @@
 """FastAPI application entry point."""
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -34,14 +34,16 @@ def create_app() -> FastAPI:
     app.middleware("http")(add_request_context)
 
     @app.exception_handler(DomainError)
-    async def domain_error_handler(_request, error: DomainError) -> JSONResponse:
+    async def domain_error_handler(
+        _request: Request, error: DomainError
+    ) -> JSONResponse:
         return _error_response(
             error.status_code, error.code, error.message, error.details
         )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(
-        _request, error: RequestValidationError
+        _request: Request, error: RequestValidationError
     ) -> JSONResponse:
         details = [
             {
@@ -57,7 +59,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error_handler(
-        _request, error: StarletteHTTPException
+        _request: Request, error: StarletteHTTPException
     ) -> JSONResponse:
         message = error.detail if isinstance(error.detail, str) else "Request failed"
         return _error_response(error.status_code, "http_error", message)

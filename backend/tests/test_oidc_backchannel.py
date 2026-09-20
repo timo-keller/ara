@@ -93,7 +93,9 @@ class _JwksClient:
 
 
 @pytest.mark.asyncio
-async def test_validate_id_token_accepts_a_real_signed_token(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+async def test_validate_id_token_accepts_a_real_signed_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     key = jwk.RSAKey.generate_key(auto_kid=True)
     now = datetime.now(UTC)
     token = jwt.encode(
@@ -164,11 +166,11 @@ async def test_validate_id_token_accepts_a_real_signed_token(monkeypatch) -> Non
     ],
 )
 async def test_validate_id_token_rejects_invalid_signed_claims(
-    monkeypatch,
-    claims,
-    header,
+    monkeypatch: pytest.MonkeyPatch,
+    claims: dict[str, str | int | list[str]],
+    header: dict[str, str],
     nonce: str,
-    wrong_key: bool,  # type: ignore[no-untyped-def]
+    wrong_key: bool,
 ) -> None:
     signing_key = (
         jwk.OctKey.import_key("test-secret-with-sufficient-length")

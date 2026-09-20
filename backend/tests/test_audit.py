@@ -1,6 +1,7 @@
 import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy import select
@@ -18,7 +19,7 @@ from ara.services.role_mappings import RoleMappingService
 
 
 @pytest.fixture
-async def database_session(tmp_path) -> AsyncIterator[AsyncSession]:  # type: ignore[no-untyped-def]
+async def database_session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
@@ -134,7 +134,7 @@ async def run_scheduled_job[JobResult](
 
 
 @asynccontextmanager
-async def scheduler_lifespan(app: FastAPI):
+async def scheduler_lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Start one scheduler for this app process and stop it gracefully."""
     scheduler = create_scheduler()
     register_reservation_reminder_job(scheduler)

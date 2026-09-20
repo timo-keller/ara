@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from asgi_client import ASGIClient
@@ -23,8 +24,8 @@ from ara.services.notifications import NotificationService
 
 @pytest.fixture
 def notification_client(
-    tmp_path,
-) -> Iterator[tuple[ASGIClient, async_sessionmaker[AsyncSession], User, User]]:  # type: ignore[no-untyped-def]
+    tmp_path: Path,
+) -> Iterator[tuple[ASGIClient, async_sessionmaker[AsyncSession], User, User]]:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
 
@@ -64,7 +65,7 @@ def notification_client(
 
 @pytest.mark.asyncio
 async def test_reminders_are_idempotent_catch_up_and_exclude_terminal_reservations(
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
@@ -122,8 +123,10 @@ async def test_reminders_are_idempotent_catch_up_and_exclude_terminal_reservatio
 
 
 def test_notifications_are_private_paginated_and_read_idempotently(
-    notification_client,
-) -> None:  # type: ignore[no-untyped-def]
+    notification_client: tuple[
+        ASGIClient, async_sessionmaker[AsyncSession], User, User
+    ],
+) -> None:
     client, factory, first, second = notification_client
 
     async def add_notifications() -> tuple[Notification, Notification]:
