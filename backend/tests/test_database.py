@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Annotated
 
@@ -83,7 +84,7 @@ def test_alembic_upgrades_a_fresh_database(tmp_path: Path) -> None:
 
     command.upgrade(config, "head")
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         version = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
@@ -114,7 +115,7 @@ def test_alembic_downgrade_and_subsequent_upgrade(tmp_path: Path) -> None:
     command.upgrade(config, "head")
     command.downgrade(config, "base")
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         tables_after_downgrade = {
             row[0]
             for row in connection.execute(
@@ -136,7 +137,7 @@ def test_alembic_downgrade_and_subsequent_upgrade(tmp_path: Path) -> None:
     )
 
     command.upgrade(config, "head")
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         version = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
@@ -149,7 +150,7 @@ def test_core_schema_enforces_integrity_constraints(tmp_path: Path) -> None:
     config.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{database_path}")
     command.upgrade(config, "head")
 
-    with sqlite3.connect(database_path) as connection:
+    with closing(sqlite3.connect(database_path)) as connection:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute(
             "INSERT INTO users (id, oidc_issuer, oidc_subject) VALUES (?, ?, ?)",

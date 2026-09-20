@@ -3,45 +3,51 @@ import logging
 import uuid
 
 from fastapi import Query
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from ara.core.errors import DomainError
 from ara.main import create_app
 from ara.services.health import get_health_service
 
 
-def test_routes_are_mounted_and_responses_have_correlation_ids() -> None:
-    client = TestClient(create_app())
-    supplied_id = str(uuid.uuid4())
+async def test_routes_are_mounted_and_responses_have_correlation_ids() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        supplied_id = str(uuid.uuid4())
+        response = await client.get(
+            "/api/health/live", headers={"X-Correlation-ID": supplied_id}
+        )
 
-    response = client.get("/api/health/live", headers={"X-Correlation-ID": supplied_id})
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+        assert response.headers["X-Correlation-ID"] == supplied_id
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-    assert response.headers["X-Correlation-ID"] == supplied_id
-
-    missing_auth_route = client.get("/auth/missing")
-    assert missing_auth_route.status_code == 404
-    assert missing_auth_route.headers["X-Correlation-ID"]
-    assert (
-        missing_auth_route.json()["correlation_id"]
-        == missing_auth_route.headers["X-Correlation-ID"]
-    )
+        missing_auth_route = await client.get("/auth/missing")
+        assert missing_auth_route.status_code == 404
+        assert missing_auth_route.headers["X-Correlation-ID"]
+        assert (
+            missing_auth_route.json()["correlation_id"]
+            == missing_auth_route.headers["X-Correlation-ID"]
+        )
 
 
-def test_liveness_does_not_require_a_database(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+async def test_liveness_does_not_require_a_database(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     def unavailable_engine() -> None:
         raise AssertionError("liveness must not access the database")
 
     monkeypatch.setattr("ara.services.health.get_engine", unavailable_engine)
 
-    response = TestClient(create_app()).get("/api/health/live")
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.get("/api/health/live")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_readiness_returns_service_unavailable_when_database_is_unavailable(
+async def test_readiness_returns_service_unavailable_when_database_is_unavailable(
     monkeypatch,
 ) -> None:  # type: ignore[no-untyped-def]
     class UnavailableHealthService:
@@ -51,7 +57,10 @@ def test_readiness_returns_service_unavailable_when_database_is_unavailable(
     app = create_app()
     app.dependency_overrides[get_health_service] = UnavailableHealthService
 
-    response = TestClient(app).get("/api/health/ready")
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        response = await client.get("/api/health/ready")
 
     assert response.status_code == 503
     assert response.json()["error"] == {
@@ -61,7 +70,7 @@ def test_readiness_returns_service_unavailable_when_database_is_unavailable(
     assert response.headers["X-Correlation-ID"]
 
 
-def test_validation_and_domain_errors_use_safe_consistent_responses() -> None:
+async def test_validation_and_domain_errors_use_safe_consistent_responses() -> None:
     app = create_app()
 
     @app.get("/api/test-validation")
@@ -74,9 +83,11 @@ def test_validation_and_domain_errors_use_safe_consistent_responses() -> None:
             "reservation_conflict", "The asset is already reserved", status_code=409
         )
 
-    client = TestClient(app)
-    validation = client.get("/api/test-validation?value=invalid")
-    domain = client.get("/api/test-domain")
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        validation = await client.get("/api/test-validation?value=invalid")
+        domain = await client.get("/api/test-domain")
 
     assert validation.status_code == 422
     assert validation.json()["error"]["code"] == "validation_error"
@@ -91,14 +102,20 @@ def test_validation_and_domain_errors_use_safe_consistent_responses() -> None:
     }
 
 
-def test_request_logs_exclude_sensitive_headers_and_settings(caplog) -> None:  # type: ignore[no-untyped-def]
+async def test_request_logs_exclude_sensitive_headers_and_settings(caplog) -> None:  # type: ignore[no-untyped-def]
     caplog.set_level(logging.INFO, logger="ara.request")
     secret = "very-secret-value"
 
-    response = TestClient(create_app()).get(
-        "/api/health/live",
-        headers={"Authorization": f"Bearer {secret}", "Cookie": f"session={secret}"},
-    )
+    async with AsyncClient(
+        transport=ASGITransport(app=create_app()), base_url="http://testserver"
+    ) as client:
+        response = await client.get(
+            "/api/health/live",
+            headers={
+                "Authorization": f"Bearer {secret}",
+                "Cookie": f"session={secret}",
+            },
+        )
 
     request_logs = [
         record.message for record in caplog.records if record.name == "ara.request"

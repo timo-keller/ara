@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from asgi_client import ASGIClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ara.api.routers import auth as auth_router
@@ -17,7 +17,7 @@ from ara.services.audit import AUDIT_ACTIONS, AUDIT_TARGET_TYPES, AuditService
 from ara.services.authorization import EffectiveRoles
 
 ApiClient = tuple[
-    TestClient,
+    ASGIClient,
     async_sessionmaker[AsyncSession],
     dict[str, EffectiveRoles],
     dict[str, object],
@@ -105,7 +105,7 @@ def audit_api_client(tmp_path) -> Iterator[ApiClient]:  # type: ignore[no-untype
 
     app.dependency_overrides[group_router.get_effective_roles] = get_roles
     app.dependency_overrides[auth_router.get_session] = get_test_session
-    with TestClient(app) as client:
+    with ASGIClient(app) as client:
         yield client, factory, roles, seeded
     asyncio.run(engine.dispose())
 

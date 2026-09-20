@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from asgi_client import ASGIClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -24,7 +24,7 @@ from ara.services.notifications import NotificationService
 @pytest.fixture
 def notification_client(
     tmp_path,
-) -> Iterator[tuple[TestClient, async_sessionmaker[AsyncSession], User, User]]:  # type: ignore[no-untyped-def]
+) -> Iterator[tuple[ASGIClient, async_sessionmaker[AsyncSession], User, User]]:  # type: ignore[no-untyped-def]
     engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'ara.db'}")
     factory = create_session_factory(engine)
 
@@ -57,8 +57,7 @@ def notification_client(
     app.dependency_overrides[auth_router.require_authenticated_user] = get_user
     app.dependency_overrides[auth_router.require_csrf] = csrf
     app.dependency_overrides[auth_router.get_session] = get_test_session
-    with TestClient(app) as client:
-        client.current_user = current  # type: ignore[attr-defined]
+    with ASGIClient(app) as client:
         yield client, factory, first, second
     asyncio.run(engine.dispose())
 

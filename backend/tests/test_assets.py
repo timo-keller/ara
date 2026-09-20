@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 from datetime import timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from asgi_client import ASGIClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ara.api.routers import auth as auth_router
@@ -16,7 +16,7 @@ from ara.main import create_app
 from ara.services.authorization import EffectiveRoles
 
 ApiClient = tuple[
-    TestClient, async_sessionmaker[AsyncSession], dict[str, EffectiveRoles]
+    ASGIClient, async_sessionmaker[AsyncSession], dict[str, EffectiveRoles]
 ]
 
 
@@ -46,7 +46,7 @@ def asset_api_client(tmp_path) -> Iterator[ApiClient]:  # type: ignore[no-untype
     app.dependency_overrides[group_router.get_effective_roles] = get_roles
     app.dependency_overrides[auth_router.require_csrf] = csrf
     app.dependency_overrides[auth_router.get_session] = get_test_session
-    with TestClient(app) as client:
+    with ASGIClient(app) as client:
         yield client, factory, roles
     asyncio.run(engine.dispose())
 
@@ -180,7 +180,7 @@ def test_asset_response_metadata_removes_legacy_credential_like_keys() -> None:
 
 
 def _create(
-    client: TestClient, group_id: str, name: str, asset_type: str, description: str
+    client: ASGIClient, group_id: str, name: str, asset_type: str, description: str
 ) -> dict[str, object]:
     response = client.post(
         "/api/assets",

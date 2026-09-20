@@ -3,7 +3,7 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
-from fastapi.testclient import TestClient
+from asgi_client import ASGIClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -18,7 +18,7 @@ from ara.services.authorization import EffectiveRoles
 from ara.services.role_mappings import RoleMappingService
 
 ApiClient = tuple[
-    TestClient, async_sessionmaker[AsyncSession], dict[str, EffectiveRoles]
+    ASGIClient, async_sessionmaker[AsyncSession], dict[str, EffectiveRoles]
 ]
 
 
@@ -60,7 +60,7 @@ def role_mapping_api_client(tmp_path) -> Iterator[ApiClient]:  # type: ignore[no
     )
     app.dependency_overrides[auth_router.require_csrf] = csrf
     app.dependency_overrides[auth_router.get_session] = get_test_session
-    with TestClient(app) as client:
+    with ASGIClient(app) as client:
         yield client, factory, roles
     asyncio.run(engine.dispose())
 

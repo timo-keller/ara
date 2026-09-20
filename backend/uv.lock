@@ -76,10 +76,10 @@ dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
     { name = "apscheduler" },
-    { name = "authlib" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jmespath" },
+    { name = "joserfc" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
@@ -98,10 +98,10 @@ requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20,<1.0" },
     { name = "alembic", specifier = ">=1.14,<2.0" },
     { name = "apscheduler", specifier = ">=3.11,<4" },
-    { name = "authlib", specifier = ">=1.4,<2.0" },
     { name = "fastapi", specifier = ">=0.115,<1.0" },
     { name = "httpx", specifier = ">=0.28,<1.0" },
     { name = "jmespath", specifier = ">=1.0,<2.0" },
+    { name = "joserfc", specifier = ">=1.0,<2.0" },
     { name = "pydantic-settings", specifier = ">=2.7,<3.0" },
     { name = "sqlalchemy", specifier = ">=2.0,<3.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30,<1.0" },
@@ -113,19 +113,6 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.0,<2.0" },
     { name = "ruff", specifier = ">=0.8,<1.0" },
     { name = "ty", specifier = ">=0.0.1" },
-]
-
-[[package]]
-name = "authlib"
-version = "1.8.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "joserfc" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/51/bc1729d3cfdc214b4935f4e886e4dd443c3065fd8e1e66423fe84b490f81/authlib-1.8.0.tar.gz", hash = "sha256:f3ecd5f1da737262fb53bf1a4d95c4ea1ad9dd509316587a255c99ab1838a4f0", size = 177759, upload-time = "2026-08-30T12:12:34.833Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/c6/6f124bcfbbfb20fba22c939b4e43a06dccfc0e1ca20e5634ca573cb1e271/authlib-1.8.0-py2.py3-none-any.whl", hash = "sha256:88aebbd9af6757e14e912d5dc007ae1dc1f3e27e3b2152ce7c552ee2c3b3c121", size = 260804, upload-time = "2026-08-30T12:12:33.162Z" },
 ]
 
 [[package]]

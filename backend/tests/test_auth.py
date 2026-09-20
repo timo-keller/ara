@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from fastapi.testclient import TestClient
+from asgi_client import ASGIClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import ara.api.routers.auth as auth
@@ -69,7 +69,7 @@ class MockProvider(oidc.OidcClient):
         }
 
 
-AuthenticatedClient = tuple[TestClient, MockProvider, async_sessionmaker[AsyncSession]]
+AuthenticatedClient = tuple[ASGIClient, MockProvider, async_sessionmaker[AsyncSession]]
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ def authenticated_client(  # type: ignore[no-untyped-def]
     app.state.oidc_client = provider
     app.dependency_overrides[auth.get_session] = session_dependency(session_factory)
     monkeypatch.setattr(auth, "get_settings", lambda: configured_settings)
-    with TestClient(app, base_url="https://ara.example.test") as client:
+    with ASGIClient(app, base_url="https://ara.example.test") as client:
         yield client, provider, session_factory
     asyncio.run(engine.dispose())
 
@@ -229,7 +229,7 @@ def test_logout_returns_only_the_fixed_provider_return_url(
     assert "provider-client-secret" not in response.text
 
 
-def _login(client: TestClient) -> None:
+def _login(client: ASGIClient) -> None:
     login = client.get("/auth/login", follow_redirects=False)
     state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
     callback = client.get(
@@ -240,7 +240,7 @@ def _login(client: TestClient) -> None:
     assert callback.status_code == 302
 
 
-def _application_session_id(client: TestClient) -> uuid.UUID:
+def _application_session_id(client: ASGIClient) -> uuid.UUID:
     payload = auth._decode(
         client.cookies[auth.SESSION_COOKIE],
         settings().session_secret.get_secret_value(),
@@ -289,11 +289,9 @@ def test_expired_and_revoked_sessions_are_rejected(
     session_cookie = client.cookies[auth.SESSION_COOKIE]
     logout = client.post("/auth/logout", headers={auth.CSRF_HEADER: csrf_token})
     assert logout.status_code == 200
-    response = client.post(
-        "/auth/logout",
-        headers={auth.CSRF_HEADER: csrf_token},
-        cookies={auth.SESSION_COOKIE: session_cookie, auth.CSRF_COOKIE: csrf_token},
-    )
+    client.cookies.set(auth.SESSION_COOKIE, session_cookie)
+    client.cookies.set(auth.CSRF_COOKIE, csrf_token)
+    response = client.post("/auth/logout", headers={auth.CSRF_HEADER: csrf_token})
     assert response.status_code == 401
 
 

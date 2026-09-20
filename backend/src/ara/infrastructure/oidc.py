@@ -6,7 +6,8 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
-from authlib.jose import JoseError, JsonWebKey, jwt
+from joserfc import jwk, jwt
+from joserfc.errors import JoseError
 
 from ara.core.config import Settings
 from ara.core.errors import DomainError
@@ -164,8 +165,13 @@ class OidcClient:
                 response = await client.get(metadata["jwks_uri"])
                 response.raise_for_status()
                 keys = response.json()
-            claims = jwt.decode(id_token, JsonWebKey.import_key_set(keys))
-            claims.validate(leeway=30)
+            token = jwt.decode(
+                id_token,
+                jwk.KeySet.import_key_set(keys),
+                algorithms=ALLOWED_ID_TOKEN_ALGORITHMS,
+            )
+            claims = token.claims
+            jwt.JWTClaimsRegistry(leeway=30, exp={"essential": True}).validate(claims)
         except httpx.HTTPError, JoseError, ValueError, TypeError:
             raise DomainError(
                 "authentication_failed", "Authentication failed", status_code=401
@@ -181,7 +187,7 @@ class OidcClient:
             )
         )
         if (
-            claims.header.get("alg") not in ALLOWED_ID_TOKEN_ALGORITHMS
+            token.header.get("alg") not in ALLOWED_ID_TOKEN_ALGORITHMS
             or not isinstance(claims.get("iss"), str)
             or claims["iss"].rstrip("/")
             != str(self.settings.oidc_issuer_url).rstrip("/")

@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 from datetime import timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from asgi_client import ASGIClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -95,7 +95,7 @@ async def test_group_service_enforces_access_and_preserves_blocked_archive(
 
 
 ApiClient = tuple[
-    TestClient, async_sessionmaker[AsyncSession], dict[str, EffectiveRoles]
+    ASGIClient, async_sessionmaker[AsyncSession], dict[str, EffectiveRoles]
 ]
 
 
@@ -125,7 +125,7 @@ def group_api_client(tmp_path) -> Iterator[ApiClient]:  # type: ignore[no-untype
     app.dependency_overrides[group_router.get_effective_roles] = get_roles
     app.dependency_overrides[auth_router.require_csrf] = csrf
     app.dependency_overrides[auth_router.get_session] = get_test_session
-    with TestClient(app) as client:
+    with ASGIClient(app) as client:
         yield client, factory, roles
     asyncio.run(engine.dispose())
 
