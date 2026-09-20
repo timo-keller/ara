@@ -1,9 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
-import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
-import { SynCardComponent } from '@synergy-design-system/angular/components/card';
 import { SynComboboxComponent } from '@synergy-design-system/angular/components/combobox';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
 import { SynOptionComponent } from '@synergy-design-system/angular/components/option';
@@ -50,9 +48,7 @@ export function assetQueryParams(filters: AssetFilters): Params {
   imports: [
     RouterLink,
     SynAlertComponent,
-    SynBadgeComponent,
     SynButtonComponent,
-    SynCardComponent,
     SynComboboxComponent,
     SynInputComponent,
     SynOptionComponent,

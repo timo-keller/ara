@@ -53,6 +53,29 @@ describe('AssetCataloguePage', () => {
     expect(fixture.nativeElement.textContent).toContain('Active asset');
     expect(fixture.nativeElement.textContent).toContain('Available now');
     expect(fixture.nativeElement.textContent).not.toContain('Archived asset');
+    const table = fixture.nativeElement.querySelector('table');
+    expect(table).not.toBeNull();
+    expect(
+      [...table.querySelectorAll('thead th')].map(
+        (header: HTMLTableCellElement) => header.textContent,
+      ),
+    ).toEqual(['Asset name', 'Asset type', 'Description', 'Availability', 'Details']);
+    expect(
+      [...table.querySelectorAll('tbody td')].map((cell: HTMLTableCellElement) =>
+        cell.textContent.trim(),
+      ),
+    ).toEqual([
+      'Active asset',
+      'device',
+      'No description provided.',
+      'Available now',
+      'View details',
+    ]);
+    expect(table.querySelector('td[data-label="Asset name"]')?.getAttribute('headers')).toBe(
+      'asset-name',
+    );
+    expect(table.querySelector('a[aria-label="View details for Active asset"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('syn-pagination')).not.toBeNull();
     const typeFilter = fixture.nativeElement.querySelector('syn-combobox');
     expect(typeFilter.hasAttribute('restricted')).toBe(true);
     expect(typeFilter.hasAttribute('clearable')).toBe(true);
@@ -111,5 +134,28 @@ describe('AssetCataloguePage', () => {
     http
       .expectOne('/api/assets?offset=0&limit=10&archived=false')
       .flush({ items: [], total: 0, offset: 0, limit: 10 });
+  });
+
+  it('renders error and empty result states without catalogue results', () => {
+    const fixture = TestBed.createComponent(AssetCataloguePage);
+    fixture.detectChanges();
+    http.expectOne('/api/groups?archived=false&limit=100').flush({ items: [] });
+    http
+      .expectOne('/api/assets?offset=0&limit=10&archived=false')
+      .flush('Unavailable', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('We could not load assets.');
+
+    fixture.componentInstance.load();
+    http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
+      items: [],
+      total: 0,
+      offset: 0,
+      limit: 10,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No active assets match these filters.');
+    expect(fixture.nativeElement.querySelector('table')).toBeNull();
+    expect(fixture.nativeElement.querySelector('syn-pagination')).toBeNull();
   });
 });

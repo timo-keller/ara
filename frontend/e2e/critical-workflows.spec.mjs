@@ -89,6 +89,33 @@ test('authenticated discovery, future/open-ended conflicts, extension, cancellat
   await expect(page.getByText('Reservation extended')).toBeVisible();
 });
 
+test('asset catalogue exposes responsive table results and keyboard detail navigation', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 480, height: 720 } });
+  const page = await context.newPage();
+  await login(context, page, 'alpha-user');
+  await page.goto(`${baseURL()}/assets`);
+
+  const table = page.getByRole('table');
+  await expect(table).toBeVisible();
+  expect(await table.getByRole('columnheader').allTextContents()).toEqual([
+    'Asset name',
+    'Asset type',
+    'Description',
+    'Availability',
+    'Details',
+  ]);
+  await expect(table.getByRole('link', { name: 'Alpha Laptop', exact: true })).toBeVisible();
+  const details = table.getByRole('link', { name: 'View details for Alpha Laptop' });
+  await expect(details).toBeVisible();
+  expect(await table.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await details.focus();
+  await details.press('Enter');
+  await expect(page).toHaveURL(/\/assets\/[^/]+$/);
+  await context.close();
+});
+
 test('My reservations is the authenticated landing page and replaces legacy Home navigation', async ({
   page,
   context,

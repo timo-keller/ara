@@ -1,5 +1,5 @@
 .filters,
-.asset-grid {
+.asset-results {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -7,12 +7,27 @@
 .filters {
   margin: var(--syn-spacing-small) 0 var(--syn-spacing-large);
 }
-.asset-grid {
+.asset-results {
   margin: var(--syn-spacing-large) 0;
 }
-.asset-grid syn-card {
-  display: block;
+
+.asset-results table {
   width: 100%;
+  border-collapse: collapse;
+  grid-column: 1 / -1;
+}
+
+.asset-results th,
+.asset-results td {
+  padding: var(--syn-spacing-small);
+  border-bottom: 1px solid var(--syn-color-neutral-300);
+  text-align: start;
+  vertical-align: top;
+}
+
+.asset-results th {
+  background: var(--syn-color-neutral-100);
+  font-weight: var(--syn-font-weight-bold);
 }
 .state {
   align-items: center;
@@ -23,5 +38,45 @@
 @media (max-width: 36rem) {
   .filters {
     grid-template-columns: 1fr;
+  }
+
+  .asset-results table,
+  .asset-results tbody,
+  .asset-results tr,
+  .asset-results td {
+    display: block;
+  }
+
+  .asset-results thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .asset-results tr {
+    margin-bottom: var(--syn-spacing-medium);
+    border: 1px solid var(--syn-color-neutral-300);
+  }
+
+  .asset-results td {
+    display: grid;
+    grid-template-columns: minmax(7rem, 40%) minmax(0, 1fr);
+    gap: var(--syn-spacing-small);
+    border-bottom: 1px solid var(--syn-color-neutral-300);
+  }
+
+  .asset-results td:last-child {
+    border-bottom: 0;
+  }
+
+  .asset-results td::before {
+    content: attr(data-label);
+    font-weight: var(--syn-font-weight-bold);
   }
 }

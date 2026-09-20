@@ -68,22 +68,41 @@
     <p class="state" aria-live="polite">No active assets match these filters.</p>
   }
   @if (state() === 'ready' && items().length) {
-    <div class="asset-grid" aria-live="polite">
-      @for (asset of items(); track asset.id) {
-        <syn-card
-          ><h2 slot="header">
-            <a [routerLink]="['/assets', asset.id]">{{ asset.name }}</a>
-          </h2>
-          <p>
-            <syn-badge>{{ asset.asset_type }}</syn-badge>
-            <syn-badge>{{
-              asset.availability === 'available' ? 'Available now' : 'Reserved now'
-            }}</syn-badge>
-          </p>
-          <p>{{ asset.description || 'No description provided.' }}</p>
-          <a slot="footer" [routerLink]="['/assets', asset.id]">View details and reservations</a>
-        </syn-card>
-      }
+    <div class="asset-results" aria-live="polite">
+      <table>
+        <thead>
+          <tr>
+            <th id="asset-name" scope="col">Asset name</th>
+            <th id="asset-type" scope="col">Asset type</th>
+            <th id="asset-description" scope="col">Description</th>
+            <th id="asset-availability" scope="col">Availability</th>
+            <th id="asset-details" scope="col">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (asset of items(); track asset.id) {
+            <tr>
+              <td data-label="Asset name" headers="asset-name">
+                <a [routerLink]="['/assets', asset.id]">{{ asset.name }}</a>
+              </td>
+              <td data-label="Asset type" headers="asset-type">{{ asset.asset_type }}</td>
+              <td data-label="Description" headers="asset-description">
+                {{ asset.description || 'No description provided.' }}
+              </td>
+              <td data-label="Availability" headers="asset-availability">
+                {{ asset.availability === 'available' ? 'Available now' : 'Reserved now' }}
+              </td>
+              <td data-label="Details" headers="asset-details">
+                <a
+                  [routerLink]="['/assets', asset.id]"
+                  [attr.aria-label]="'View details for ' + asset.name"
+                  >View details</a
+                >
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </div>
     <syn-pagination
       aria-label="Asset catalogue pages"
