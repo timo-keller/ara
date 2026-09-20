@@ -14,21 +14,12 @@
     <div class="appshell-content">
       <syn-side-nav variant="rail" aria-label="Main navigation">
         <syn-nav-item
-          [attr.current]="isCurrent('/') ? '' : null"
-          href="/"
-          (click)="navigate('/', $event)"
-        >
-          <syn-icon aria-hidden="true" library="ara" name="home" slot="prefix"></syn-icon>
-          Home
-        </syn-nav-item>
-        <syn-nav-item
           [attr.current]="isCurrent('/reservations') ? '' : null"
-          divider
           href="/reservations"
           (click)="navigate('/reservations', $event)"
         >
           <syn-icon aria-hidden="true" library="ara" name="calendar_today" slot="prefix"></syn-icon>
-          Reservations
+          My reservations
         </syn-nav-item>
         @if (auth.hasGroupAccess()) {
           <syn-nav-item

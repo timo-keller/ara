@@ -5,7 +5,7 @@ const baseURL = () => process.env.ARA_E2E_URL;
 async function login(context, page, identity) {
   await context.addCookies([{ name: 'e2e_identity', value: identity, url: baseURL() }]);
   await page.goto(`${baseURL()}/auth/login`);
-  await page.waitForURL(`${baseURL()}/`);
+  await page.waitForURL(`${baseURL()}/reservations`);
 }
 
 async function setSynInput(page, label, value) {
@@ -75,6 +75,23 @@ test('authenticated discovery, future/open-ended conflicts, extension, cancellat
   await expect(page.getByText('Reservation extended')).toBeVisible();
 });
 
+test('My reservations is the authenticated landing page and replaces legacy Home navigation', async ({
+  page,
+  context,
+}) => {
+  await login(context, page, 'alpha-user');
+
+  await expect(page).toHaveURL(`${baseURL()}/reservations`);
+  await expect(page.getByRole('heading', { name: 'My reservations' })).toBeVisible();
+  const reservationsNavigation = page.locator('syn-nav-item[href="/reservations"]');
+  await expect(reservationsNavigation).toHaveAttribute('current', '');
+  await expect(page.getByText('Home', { exact: true })).toHaveCount(0);
+
+  await page.goto(`${baseURL()}/home`);
+  await expect(page).toHaveURL(`${baseURL()}/reservations`);
+  await expect(reservationsNavigation).toHaveAttribute('current', '');
+});
+
 test('settings menu exposes notifications and preserves compact mode', async ({
   page,
   context,
@@ -142,7 +159,7 @@ test('group admin is scoped in the UI, API, and audit history while a user is de
   const user = await userContext.newPage();
   await login(userContext, user, 'alpha-user');
   await user.goto(`${baseURL()}/asset-administration`);
-  await expect(user).toHaveURL(`${baseURL()}/`);
+  await expect(user).toHaveURL(`${baseURL()}/reservations`);
   const auditDenied = await csrfFetch(user, '/api/audit-events');
   expect(auditDenied.status).toBe(403);
   await userContext.close();

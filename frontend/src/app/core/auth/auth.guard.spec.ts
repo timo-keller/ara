@@ -1,10 +1,17 @@
 import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { routes } from '../../app.routes';
 import { AuthService } from './auth.service';
-import { assetAdministrationGuard, auditGuard, authenticatedGuard, ownerGuard } from './auth.guard';
+import {
+  assetAdministrationGuard,
+  auditGuard,
+  authenticatedGuard,
+  landingGuard,
+  legacyHomeGuard,
+  ownerGuard,
+} from './auth.guard';
 
 describe('authenticatedGuard', () => {
   it('permits an already authenticated session', async () => {
@@ -19,6 +26,48 @@ describe('authenticatedGuard', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('redirects authenticated root and legacy Home visits to My reservations', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter(routes)] });
+    const auth = TestBed.inject(AuthService);
+    const router = TestBed.inject(Router);
+    auth.state.set('authenticated');
+
+    const landing = await TestBed.runInInjectionContext(() =>
+      firstValueFrom(
+        landingGuard({} as never, {} as never) as ReturnType<typeof auth.ensureSession>,
+      ),
+    );
+    const legacyHome = await TestBed.runInInjectionContext(() =>
+      firstValueFrom(
+        legacyHomeGuard({} as never, {} as never) as ReturnType<typeof auth.ensureSession>,
+      ),
+    );
+
+    expect(router.serializeUrl(landing as never)).toBe('/reservations');
+    expect(router.serializeUrl(legacyHome as never)).toBe('/reservations');
+  });
+
+  it('allows anonymous root visits and returns legacy Home visits to root', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideRouter(routes)] });
+    const auth = TestBed.inject(AuthService);
+    const router = TestBed.inject(Router);
+    auth.state.set('anonymous');
+
+    const landing = await TestBed.runInInjectionContext(() =>
+      firstValueFrom(
+        landingGuard({} as never, {} as never) as ReturnType<typeof auth.ensureSession>,
+      ),
+    );
+    const legacyHome = await TestBed.runInInjectionContext(() =>
+      firstValueFrom(
+        legacyHomeGuard({} as never, {} as never) as ReturnType<typeof auth.ensureSession>,
+      ),
+    );
+
+    expect(landing).toBe(true);
+    expect(router.serializeUrl(legacyHome as never)).toBe('/');
   });
 
   it('redirects non-Owners away from administration routes', async () => {

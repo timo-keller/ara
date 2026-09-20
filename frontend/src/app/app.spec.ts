@@ -66,6 +66,14 @@ describe('App', () => {
     expect(accountNavigation.querySelector('.account-name')?.textContent?.trim()).toBe('Ada');
     expect(fixture.nativeElement.textContent).not.toContain('Effective roles');
     expect(fixture.nativeElement.querySelector('.effective-roles')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Home');
+    const reservationsNavigation = fixture.nativeElement.querySelector(
+      'syn-nav-item[href="/reservations"]',
+    ) as HTMLElement;
+    expect(reservationsNavigation?.textContent?.trim()).toBe('My reservations');
+    fixture.componentInstance.currentUrl.set('/reservations');
+    fixture.detectChanges();
+    expect(reservationsNavigation?.getAttribute('current')).toBe('');
     expect(fixture.nativeElement.textContent).toContain('Administration');
     expect(fixture.nativeElement.textContent).toContain('Audit history');
     const navigationIconName = (label: string) => {

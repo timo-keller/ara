@@ -11,6 +11,24 @@ export const authenticatedGuard: CanActivateFn = () => {
     .pipe(map((authenticated) => authenticated || router.createUrlTree(['/'])));
 };
 
+/** Sends authenticated visitors to their primary landing page without blocking sign-in. */
+export const landingGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  return auth
+    .ensureSession()
+    .pipe(map((authenticated) => (authenticated ? router.createUrlTree(['/reservations']) : true)));
+};
+
+/** Keeps existing Home bookmarks working while returning anonymous visitors to sign-in. */
+export const legacyHomeGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  return auth
+    .ensureSession()
+    .pipe(map((authenticated) => router.createUrlTree([authenticated ? '/reservations' : '/'])));
+};
+
 export const ownerGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);

@@ -4,14 +4,22 @@ import {
   auditGuard,
   authenticatedGuard,
   groupAccessGuard,
+  landingGuard,
+  legacyHomeGuard,
   ownerGuard,
 } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
     path: '',
+    canActivate: [landingGuard],
     loadComponent: () => import('./features/home/home.page').then((module) => module.HomePage),
     pathMatch: 'full',
+  },
+  {
+    path: 'home',
+    canActivate: [legacyHomeGuard],
+    loadComponent: () => import('./features/home/home.page').then((module) => module.HomePage),
   },
   {
     path: 'reservations',
