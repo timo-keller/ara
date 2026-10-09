@@ -53,9 +53,9 @@ describe('App', () => {
     });
     fixture.detectChanges();
 
-    const rail = fixture.nativeElement.querySelector('syn-side-nav');
-    expect(rail?.getAttribute('variant')).toBe('rail');
-    expect(connectSideNavigation).toHaveBeenCalledWith(rail);
+    const sideNav = fixture.nativeElement.querySelector('syn-side-nav');
+    expect(sideNav?.getAttribute('variant')).toBe('sticky');
+    expect(connectSideNavigation).toHaveBeenCalledWith(sideNav);
     const accountNavigation = fixture.nativeElement.querySelector(
       'nav[aria-label="Account"]',
     ) as HTMLElement;
