@@ -54,7 +54,7 @@
             Audit history
           </syn-nav-item>
         }
-        @if (auth.roles()?.is_owner) {
+        @if (auth.hasAssetAdministrationAccess()) {
           <syn-nav-item
             [attr.current]="isCurrent('/administration') ? '' : null"
             divider

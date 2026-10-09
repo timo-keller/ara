@@ -5,6 +5,8 @@ export interface Group {
   id: string;
   name: string;
   description: string | null;
+  webex_room_id: string | null;
+  webex_space_link?: string | null;
   archived_at: string | null;
 }
 
@@ -30,6 +32,22 @@ export interface ApiError {
   error?: { code: string; message: string; details?: ApiErrorDetail[] };
 }
 
+export interface WebexDelivery {
+  id: string;
+  kind: string;
+  state: string;
+  attempts: number;
+  created_at: string;
+  delivered_at: string | null;
+  error_code: string | null;
+}
+
+export interface WebexStatus {
+  configured: boolean;
+  counts: Record<string, number>;
+  items: WebexDelivery[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdministrationService {
   private readonly http = inject(HttpClient);
@@ -46,6 +64,18 @@ export class AdministrationService {
 
   updateGroup(id: string, payload: Partial<Pick<Group, 'name' | 'description'>>) {
     return this.http.patch<Group>(`/api/groups/${id}`, payload);
+  }
+
+  updateWebexRoom(id: string, webex_space_link: string | null) {
+    return this.http.patch<Group>(`/api/groups/${id}/webex`, { webex_space_link });
+  }
+
+  webexStatus(id: string) {
+    return this.http.get<WebexStatus>(`/api/groups/${id}/webex`);
+  }
+
+  testWebexRoom(id: string) {
+    return this.http.post<WebexDelivery>(`/api/groups/${id}/webex/test`, {});
   }
 
   archiveGroup(id: string) {

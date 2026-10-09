@@ -23,11 +23,13 @@ class ConfigurationError(ValueError):
 
 
 _SECRET_FILE_SETTINGS = {
+    "ARA_WEBEX_BOT_TOKEN_FILE": "webex_bot_token",
     "ARA_OIDC_CLIENT_SECRET_FILE": "oidc_client_secret",
     "ARA_SESSION_SECRET_FILE": "session_secret",
     "ARA_OWNER_SUBJECTS_FILE": "owner_subjects",
 }
 _DIRECT_SECRET_SETTINGS = {
+    "ARA_WEBEX_BOT_TOKEN": "webex_bot_token",
     "ARA_OIDC_CLIENT_SECRET": "oidc_client_secret",
     "ARA_SESSION_SECRET": "session_secret",
     "ARA_OWNER_SUBJECTS": "owner_subjects",
@@ -142,6 +144,14 @@ class Settings(BaseSettings):
     owner_claim_expression: str | None = None
     audit_retention_days: int = Field(default=365, gt=0)
     notification_reminder_offsets_minutes: tuple[int, ...] = (60, 15, 0)
+    webex_bot_token: SecretStr | None = None
+
+    @field_validator("webex_bot_token")
+    @classmethod
+    def require_webex_token(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and not value.get_secret_value().strip():
+            raise ValueError("must not be empty")
+        return value
 
     @field_validator("oidc_scopes", mode="before")
     @classmethod

@@ -6,7 +6,6 @@ import {
   groupAccessGuard,
   landingGuard,
   legacyHomeGuard,
-  ownerGuard,
 } from './core/auth/auth.guard';
 
 export const routes: Routes = [
@@ -53,7 +52,7 @@ export const routes: Routes = [
   },
   {
     path: 'administration',
-    canActivate: [ownerGuard],
+    canActivate: [assetAdministrationGuard],
     data: { title: 'Administration' },
     loadComponent: () =>
       import('./features/administration/administration.page').then(

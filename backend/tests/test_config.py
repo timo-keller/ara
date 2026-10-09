@@ -32,6 +32,20 @@ def test_settings_load_non_sensitive_environment_values() -> None:
     assert settings.audit_retention_days == 90
 
 
+def test_webex_is_optional_and_secret_files_are_redacted(tmp_path: Path) -> None:
+    assert Settings.from_environment(environment()).webex_bot_token is None
+    (tmp_path / "webex").write_text("bot-secret\n", encoding="utf-8")
+    values = environment() | {"ARA_WEBEX_BOT_TOKEN_FILE": "webex"}
+    configured = Settings.from_environment(values, tmp_path)
+    assert configured.webex_bot_token is not None
+    assert configured.webex_bot_token.get_secret_value() == "bot-secret"
+    assert "bot-secret" not in repr(configured)
+    with pytest.raises(ConfigurationError, match="cannot both be set"):
+        Settings.from_environment(values | {"ARA_WEBEX_BOT_TOKEN": "direct"}, tmp_path)
+    with pytest.raises(ValidationError, match="must not be empty"):
+        Settings.from_environment(environment() | {"ARA_WEBEX_BOT_TOKEN": " "})
+
+
 @pytest.mark.parametrize("value", ["", "15 15", "-1, 0"])
 def test_reminder_offsets_are_validated(value: str) -> None:
     with pytest.raises(ValidationError):

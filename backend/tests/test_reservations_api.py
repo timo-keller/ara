@@ -8,9 +8,11 @@ import pytest
 from asgi_client import ASGIClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from test_config import environment
 
 from ara.api.routers import auth as auth_router
 from ara.api.routers import groups as group_router
+from ara.core.config import Settings, get_settings
 from ara.core.errors import DomainError
 from ara.domain.models import (
     Asset,
@@ -50,6 +52,9 @@ def reservation_api_client(tmp_path: Path) -> Iterator[ApiClient]:
 
     user = asyncio.run(initialise())
     app = create_app()
+    app.dependency_overrides[get_settings] = lambda: Settings.from_environment(
+        environment()
+    )
     roles = {"value": EffectiveRoles(is_owner=False, group_roles={})}
 
     async def get_user() -> User:

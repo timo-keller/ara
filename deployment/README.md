@@ -4,7 +4,7 @@ The root `compose.yaml` runs the API and Caddy web service. Only Caddy publishes
 HTTPS (port `443` by default); the API is reachable only from Caddy on the
 dedicated internal application network. Caddy additionally has an ingress-only
 network for Docker's published-port routing, while the API has an unpublished
-egress network so it can contact the configured OIDC issuer.
+egress network so it can contact the configured OIDC issuer and Webex.
 
 ## Local development
 
@@ -68,6 +68,69 @@ finish request shutdown, while Caddy receives 15 seconds for graceful proxy
 shutdown. The deployment intentionally runs exactly one backend container and
 one Uvicorn worker: its SQLite write model and in-process APScheduler are not
 safe to scale horizontally.
+
+## Optional Webex bot notifications
+
+Create an ARA bot at <https://developer.webex.com/my-apps/new/bot>. Store only its
+token in the ignored `secrets/webex_bot_token` file (no `Bearer` prefix or quotes).
+For production, use the same UID `10001` ownership and mode `600` as the other
+backend secrets. Enable the optional secret mount with:
+
+```sh
+docker compose -f compose.yaml -f compose.webex.yaml up --build -d
+```
+
+`ARA_WEBEX_BOT_TOKEN_FILE` on the host may override the source file path. Inside
+the backend it is always mounted at `/run/secrets/webex_bot_token`. Use both
+Compose files for subsequent recreation and token rotation. Without the overlay,
+Webex is disabled and no token file is required.
+
+For the local launcher, retain ownership by your local user and opt in explicitly:
+
+```sh
+ARA_DEV_WEBEX=1 ./run-dev.sh up
+```
+
+Use `ARA_DEV_WEBEX=1` for subsequent launcher commands when working with that
+deployment. The local Keycloak sample users have example email addresses; real
+personal delivery requires the user's OIDC email to identify their Webex account.
+
+In **Group administration**, add **ARA Notification Bot** to the intended group
+space, copy its Webex space link (`webexteams://im?space=<UUID>`), paste it into
+**Webex space link**, and select **Save space link**. ARA resolves the space through
+the bot's room list and keeps its canonical room ID and link. If the space is not
+visible, add the bot and try again. Missing/invalid tokens, rate limits, and Webex
+outages produce actionable errors and preserve the previous configuration.
+Lookups stop after 20 pages or 30 seconds; retry after transient failures.
+Existing group room-ID configurations remain active. Clearing and saving the link
+disables room notifications without affecting personal messages.
+Use **Send test message** to verify the saved configuration, even if the input has
+unsaved edits. Tests are queued; **Refresh delivery status**
+shows pending, delivered, failed, or skipped outcomes and safe error categories.
+Owners and responsible Group Admins can manage this configuration. Role mappings
+and group lifecycle administration remain Owner-only.
+
+Room messages announce reservation starts and explicit returns. Each asset's
+**Send group-room notifications** checkbox defaults on and can suppress them.
+Personal reminders use the reserving user's OIDC email and are independent of
+the room and checkbox. Personal start messages apply only to reservations
+originally scheduled for the future. Existing asset-level room IDs are discarded
+by migration; configure rooms afresh on groups.
+
+The dispatcher runs every 15 seconds in bounded batches of 20. Future-start
+catch-up is limited to one hour and excludes reservations already ended; end
+reminders catch up for at most 24 hours. Transient failures retry up to six
+attempts with exponential backoff; rate limits honor `Retry-After`. Invalid bot
+tokens pause all dispatch for 15 minutes and are visible as failed deliveries.
+Fix the token and recreate the backend; send another test to verify it. Terminal
+failures are not automatically replayed. Completed outbox records are retained
+for 30 days and cleaned in batches.
+
+Queue entries are deduplicated locally. If Webex accepts a POST but the response
+is lost (or ARA crashes before saving success), retrying can duplicate the remote
+message. Delivered means Webex accepted the message, not that the recipient
+read it or received a desktop alert. This integration is outbound-only; receiving
+bot replies/webhooks is outside this feature.
 
 ## Persistence, backup, and maintenance
 

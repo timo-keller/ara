@@ -8,6 +8,9 @@ operation=${1:-up}
 dev=.dev
 env_file=$dev/dev.env
 app_compose=(docker compose --project-name ara-dev --env-file "$env_file" -f compose.yaml -f compose.dev.yaml)
+if [[ ${ARA_DEV_WEBEX:-0} == 1 ]]; then
+  app_compose+=(-f compose.webex.yaml)
+fi
 kc_compose=(docker compose --project-name ara-dev-keycloak --env-file "$env_file" -f compose.keycloak.dev.yaml)
 
 die() { printf 'run-dev: %s\n' "$*" >&2; exit 1; }

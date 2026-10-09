@@ -15,10 +15,12 @@ from ara.infrastructure.scheduler import (
     MISFIRE_GRACE_TIME_SECONDS,
     RESERVATION_REMINDER_JOB_ID,
     SCHEDULER_JOB_DEFAULTS,
+    WEBEX_JOB_ID,
     cleanup_expired_audit_events,
     create_scheduler,
     register_audit_retention_job,
     register_reservation_reminder_job,
+    register_webex_job,
     run_scheduled_job,
     scheduler_lifespan,
 )
@@ -45,6 +47,13 @@ def test_audit_retention_job_registration_does_not_duplicate_the_job() -> None:
     register_audit_retention_job(scheduler)
 
     assert [job.id for job in scheduler.get_jobs()] == [AUDIT_RETENTION_JOB_ID]
+
+
+def test_webex_job_registration_does_not_duplicate_the_job() -> None:
+    scheduler = create_scheduler()
+    register_webex_job(scheduler)
+    register_webex_job(scheduler)
+    assert [job.id for job in scheduler.get_jobs()] == [WEBEX_JOB_ID]
 
 
 @pytest.mark.asyncio

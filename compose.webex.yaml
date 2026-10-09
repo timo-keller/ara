@@ -1,0 +1,11 @@
+# Opt in with: docker compose -f compose.yaml -f compose.webex.yaml up --build
+services:
+  backend:
+    environment:
+      ARA_WEBEX_BOT_TOKEN_FILE: /run/secrets/webex_bot_token
+    secrets:
+      - webex_bot_token
+
+secrets:
+  webex_bot_token:
+    file: ${ARA_WEBEX_BOT_TOKEN_FILE:-./secrets/webex_bot_token}

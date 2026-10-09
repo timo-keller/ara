@@ -1,4 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
+import { of } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { Component, computed, inject, signal } from '@angular/core';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
 import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
@@ -15,6 +18,7 @@ import {
   ApiErrorDetail,
   Group,
   RoleMapping,
+  WebexStatus,
 } from './administration.service';
 
 interface GroupDraft {
@@ -52,6 +56,7 @@ const emptyMappingDraft = (groupId = ''): MappingDraft => ({
     SynSelectComponent,
     SynSpinnerComponent,
     SynTextareaComponent,
+    DatePipe,
   ],
   selector: 'app-administration-page',
   styleUrl: './administration.page.scss',
@@ -59,6 +64,13 @@ const emptyMappingDraft = (groupId = ''): MappingDraft => ({
 })
 export class AdministrationPage {
   private readonly administration = inject(AdministrationService);
+  private readonly auth = inject(AuthService);
+  readonly isOwner = computed(() => !!this.auth.roles()?.is_owner);
+  readonly spaceLink = signal('');
+  readonly webexStatus = signal<WebexStatus | null>(null);
+  readonly webexState = signal<'loading' | 'ready' | 'error'>('ready');
+  readonly webexNotice = signal<string | null>(null);
+  readonly webexBusy = signal(false);
   readonly groups = signal<Group[]>([]);
   readonly orderedGroups = computed(() =>
     [...this.groups()].sort((left, right) => this.compareByNameAndId(left, right)),
@@ -104,8 +116,12 @@ export class AdministrationPage {
     this.error.set(null);
     this.administration.groups().subscribe({
       next: ({ items }) => {
+        items = this.isOwner()
+          ? items
+          : items.filter((group) => this.auth.roles()?.group_roles[group.id] === 'group_admin');
         this.groups.set(items);
-        this.administration.mappings().subscribe({
+        const mappingsRequest = this.isOwner() ? this.administration.mappings() : of({ items: [] });
+        mappingsRequest.subscribe({
           next: ({ items: mappings }) => {
             this.mappings.set(mappings);
             if (selectedGroupId) {
@@ -129,12 +145,17 @@ export class AdministrationPage {
   editGroup(group: Group): void {
     this.groupDraft.set({ id: group.id, name: group.name, description: group.description ?? '' });
     this.ensureMappingContext(group.id);
+    this.spaceLink.set(group.webex_space_link ?? '');
+    this.webexNotice.set(null);
+    this.webexBusy.set(false);
+    this.refreshWebex();
   }
 
   createGroup(): void {
     this.error.set(null);
     this.archiveConflicts.set([]);
     this.groupDraft.set(emptyGroupDraft());
+    this.webexStatus.set(null);
   }
 
   saveGroup(): void {
@@ -147,6 +168,72 @@ export class AdministrationPage {
     request.subscribe({
       next: (group) => this.load(group.id),
       error: (error) => this.showApiError(error),
+    });
+  }
+
+  refreshWebex(): void {
+    const id = this.groupDraft().id;
+    if (!id) return;
+    this.webexStatus.set(null);
+    this.webexState.set('loading');
+    this.administration.webexStatus(id).subscribe({
+      next: (status) => {
+        if (this.groupDraft().id !== id) return;
+        this.webexStatus.set(status);
+        this.webexState.set('ready');
+      },
+      error: () => {
+        if (this.groupDraft().id === id) this.webexState.set('error');
+      },
+    });
+  }
+
+  saveWebexRoom(): void {
+    const id = this.groupDraft().id;
+    if (!id || this.webexBusy()) return;
+    this.webexBusy.set(true);
+    this.error.set(null);
+    this.webexNotice.set('Resolving and saving Webex space…');
+    this.administration.updateWebexRoom(id, this.spaceLink().trim() || null).subscribe({
+      next: (group) => {
+        this.groups.update((groups) => groups.map((item) => (item.id === group.id ? group : item)));
+        if (this.groupDraft().id !== id) return;
+        this.webexBusy.set(false);
+        this.spaceLink.set(group.webex_space_link ?? '');
+        this.webexNotice.set(
+          group.webex_room_id
+            ? 'Webex space saved. Send a test message to verify delivery.'
+            : 'Room notifications disabled.',
+        );
+        this.refreshWebex();
+      },
+      error: (error) => {
+        if (this.groupDraft().id !== id) return;
+        this.webexBusy.set(false);
+        this.webexNotice.set(null);
+        this.showApiError(error);
+      },
+    });
+  }
+
+  testWebexRoom(): void {
+    const id = this.groupDraft().id;
+    if (!id || this.webexBusy()) return;
+    this.webexBusy.set(true);
+    this.administration.testWebexRoom(id).subscribe({
+      next: () => {
+        if (this.groupDraft().id !== id) return;
+        this.webexBusy.set(false);
+        this.webexNotice.set(
+          'Test queued for the saved room. Refresh status shortly to see the result.',
+        );
+        this.refreshWebex();
+      },
+      error: (error) => {
+        if (this.groupDraft().id !== id) return;
+        this.webexBusy.set(false);
+        this.showApiError(error);
+      },
     });
   }
 

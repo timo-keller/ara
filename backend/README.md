@@ -191,3 +191,33 @@ filters, and all other filters, are intersected. Supported actions are
 Supported target types are `asset`, `group`, `reservation`, and `role_mapping`.
 Owners can query all events, while Group Admins see only events associated with
 their administered groups. Users are denied access.
+## Webex delivery
+
+The optional `ARA_WEBEX_BOT_TOKEN_FILE` Docker secret enables outbound Webex bot
+delivery. `ARA_WEBEX_BOT_TOKEN` is also supported for explicit local/test settings;
+do not set both forms. Tokens are redacted and never persisted in the outbox.
+
+`PATCH /api/groups/{id}/webex` accepts `webex_space_link` (or null to disable
+room notifications). Add **ARA Notification Bot** to a group space, copy its
+`webexteams://im?space=<UUID>` link, save it, and send a test. Resolution saves
+the actual canonical room ID returned by Webex plus the normalized display link.
+Legacy `webex_room_id` API updates and existing room configurations remain supported.
+Lookups use only `https://webexapis.com/v1/rooms`, at most 20 pages of 100 rooms,
+with a 15-second HTTP timeout and a 30-second total deadline. Pagination URLs
+must target that same HTTPS endpoint. Network calls run outside the database
+transaction; failed lookups preserve both previous settings and audit history.
+Errors distinguish invalid links, unavailable Webex, missing/invalid credentials,
+rate limits, and missing bot membership without exposing remote response bodies.
+
+`GET /api/groups/{id}/webex` returns room-only counts and the latest 20 delivery
+states; `POST /api/groups/{id}/webex/test` queues a test and returns HTTP 202.
+All require Owner or responsible Group Admin access; mutations also require
+CSRF protection. Room settings are audited. The asset API accepts
+`room_notifications_enabled` (default true), replacing its removed room-ID field.
+
+The durable dispatcher is registered in the FastAPI scheduler lifespan. It
+queues due future starts and personal end reminders, while reservation creation
+and explicit returns stage room events in their domain transaction. Webex
+delivery is independent of browser notification read state. See
+`deployment/README.md` for opt-in Compose setup, retry/catch-up defaults, retention,
+and the ambiguous remote-delivery limitation.

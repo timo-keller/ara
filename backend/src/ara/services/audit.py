@@ -83,6 +83,8 @@ def group_snapshot(group: Group) -> dict[str, Any]:
         "id": str(group.id),
         "name": group.name,
         "description": group.description,
+        "webex_room_id": group.webex_room_id,
+        "webex_space_link": group.webex_space_link,
         "archived_at": _time(group.archived_at),
     }
 
@@ -109,7 +111,7 @@ def asset_snapshot(asset: Asset) -> dict[str, Any]:
         "remote_host": asset.remote_host,
         "remote_url": asset.remote_url,
         "operating_system": asset.operating_system,
-        "webex_room_id": asset.webex_room_id,
+        "room_notifications_enabled": asset.room_notifications_enabled,
         "archived_at": _time(asset.archived_at),
     }
 

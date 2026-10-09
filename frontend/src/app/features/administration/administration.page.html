@@ -1,7 +1,8 @@
 <section class="administration-content route-page" aria-labelledby="administration-heading">
   <h1 id="administration-heading">Group administration</h1>
   <p class="route-introduction">
-    Only Owners can administer groups and the role mappings that grant group access.
+    Owners manage groups and role mappings. Group Admins manage Webex notifications for their
+    groups.
   </p>
 
   @if (error()) {
@@ -28,7 +29,11 @@
     <section class="group-list-pane" aria-labelledby="groups-heading">
       <div class="list-heading">
         <h2 id="groups-heading">Groups</h2>
-        <syn-button type="button" variant="filled" (click)="createGroup()">Create group</syn-button>
+        @if (isOwner()) {
+          <syn-button type="button" variant="filled" (click)="createGroup()"
+            >Create group</syn-button
+          >
+        }
       </div>
       @if (state() === 'loading') {
         <p class="state" aria-live="polite">
@@ -68,42 +73,132 @@
     </section>
 
     <syn-card class="group-editor">
-      <h2 slot="header">{{ groupDraft().id ? 'Edit group' : 'Create group' }}</h2>
+      <h2 slot="header">
+        {{ groupDraft().id ? 'Edit group' : isOwner() ? 'Create group' : 'Select a group' }}
+      </h2>
       @if (groupDraft().id) {
         <p class="selected-group" aria-live="polite">Editing {{ groupDraft().name }}</p>
       }
-      <form (submit)="$event.preventDefault(); saveGroup()">
-        <syn-input
-          label="Group name"
-          required
-          [value]="groupDraft().name"
-          (valueChange)="changeGroup('name', $event)"
-        ></syn-input>
-        <syn-textarea
-          label="Description"
-          [value]="groupDraft().description"
-          (valueChange)="changeGroup('description', $event)"
-        >
-          <span slot="help-text"><strong>Optional</strong></span>
-        </syn-textarea>
-        <div class="actions">
-          <syn-button type="submit" variant="filled">{{
-            groupDraft().id ? 'Save group' : 'Create group'
-          }}</syn-button>
-          @if (selectedGroup(); as selectedGroup) {
-            @if (selectedGroup.archived_at) {
-              <syn-button type="button" (click)="reactivateGroup(selectedGroup)"
-                >Reactivate group</syn-button
+      @if (isOwner()) {
+        <form (submit)="$event.preventDefault(); saveGroup()">
+          <syn-input
+            label="Group name"
+            required
+            [value]="groupDraft().name"
+            (valueChange)="changeGroup('name', $event)"
+          ></syn-input>
+          <syn-textarea
+            label="Description"
+            [value]="groupDraft().description"
+            (valueChange)="changeGroup('description', $event)"
+          >
+            <span slot="help-text"><strong>Optional</strong></span>
+          </syn-textarea>
+          <div class="actions">
+            <syn-button type="submit" variant="filled">{{
+              groupDraft().id ? 'Save group' : 'Create group'
+            }}</syn-button>
+            @if (selectedGroup(); as selectedGroup) {
+              @if (selectedGroup.archived_at) {
+                <syn-button type="button" (click)="reactivateGroup(selectedGroup)"
+                  >Reactivate group</syn-button
+                >
+              } @else {
+                <syn-button type="button" variant="outline" (click)="archiveGroup(selectedGroup)"
+                  >Archive group</syn-button
+                >
+              }
+            }
+          </div>
+        </form>
+      }
+      @if (selectedGroup(); as group) {
+        <section class="webex-settings" aria-labelledby="webex-heading">
+          <h2 id="webex-heading">Webex notifications</h2>
+          <ol>
+            <li>Add <strong>ARA Notification Bot</strong> to the intended Webex space.</li>
+            <li>Copy that space's link from Webex.</li>
+            <li>Paste the link here and save it.</li>
+            <li>Send a test message to verify delivery.</li>
+          </ol>
+          @if (group.webex_room_id && !group.webex_space_link) {
+            <p>
+              An existing room configuration is active. You can test it now or replace it with a
+              space link. Saving an empty link disables it.
+            </p>
+          }
+          <form (submit)="$event.preventDefault(); saveWebexRoom()">
+            <syn-input
+              label="Webex space link"
+              [value]="spaceLink()"
+              [disabled]="!!group.archived_at || webexBusy()"
+              (valueChange)="spaceLink.set($event)"
+              placeholder="webexteams://im?space=c149af1a-71e9-4955-a2b0-9ca8b423b129"
+              help-text="Optional. Clear and save the link to stop room notifications. Personal messages remain independent."
+            ></syn-input>
+            <div class="actions">
+              <syn-button
+                type="submit"
+                variant="filled"
+                [disabled]="!!group.archived_at || webexBusy()"
+                >Save space link</syn-button
               >
-            } @else {
-              <syn-button type="button" variant="outline" (click)="archiveGroup(selectedGroup)"
-                >Archive group</syn-button
+              <syn-button
+                type="button"
+                (click)="testWebexRoom()"
+                [disabled]="
+                  !!group.archived_at ||
+                  webexBusy() ||
+                  !group.webex_room_id ||
+                  !webexStatus()?.configured
+                "
+                >Send test message</syn-button
+              >
+              <syn-button type="button" (click)="refreshWebex()"
+                >Refresh delivery status</syn-button
+              >
+            </div>
+          </form>
+          @if (webexNotice()) {
+            <p role="status">{{ webexNotice() }}</p>
+          }
+          @if (webexState() === 'loading') {
+            <p role="status">Loading delivery status…</p>
+          } @else if (webexState() === 'error') {
+            <syn-alert open variant="error"
+              >Could not load delivery status. Try refreshing.</syn-alert
+            >
+          } @else if (webexStatus(); as status) {
+            @if (!status.configured) {
+              <syn-alert open variant="neutral"
+                >Webex delivery is disabled. Configure the bot token on the server to enable
+                it.</syn-alert
               >
             }
+            <p>
+              Pending: {{ (status.counts['pending'] || 0) + (status.counts['sending'] || 0) }} ·
+              Failed: {{ status.counts['failed'] || 0 }}
+            </p>
+            <h3>Recent room deliveries</h3>
+            @for (delivery of status.items; track delivery.id) {
+              <article class="list-item">
+                <div>
+                  <strong>{{ delivery.kind }}</strong> · {{ delivery.state }} <br />{{
+                    delivery.created_at | date: 'medium'
+                  }}
+                  · Attempts: {{ delivery.attempts }}
+                  @if (delivery.error_code) {
+                    <br />{{ delivery.error_code }}
+                  }
+                </div>
+              </article>
+            } @empty {
+              <p>No room deliveries yet.</p>
+            }
           }
-        </div>
-      </form>
-      @if (state() === 'ready') {
+        </section>
+      }
+      @if (state() === 'ready' && isOwner()) {
         @if (selectedGroup(); as selectedGroup) {
           <section
             class="role-mappings"

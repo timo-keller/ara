@@ -83,7 +83,7 @@ class AssetCreateSchema(_AssetInputSchema):
     remote_url: str | None = None
     operating_system: str | None = None
     access_instructions: str | None = None
-    webex_room_id: str | None = None
+    room_notifications_enabled: bool = True
 
 
 class AssetUpdateSchema(_AssetInputSchema):
@@ -95,10 +95,15 @@ class AssetUpdateSchema(_AssetInputSchema):
     remote_url: str | None = None
     operating_system: str | None = None
     access_instructions: str | None = None
-    webex_room_id: str | None = None
+    room_notifications_enabled: bool | None = None
 
     @model_validator(mode="after")
     def requires_change(self) -> AssetUpdateSchema:
+        if (
+            "room_notifications_enabled" in self.model_fields_set
+            and self.room_notifications_enabled is None
+        ):
+            raise ValueError("room_notifications_enabled cannot be null")
         if not self.model_fields_set:
             raise ValueError("At least one asset field is required")
         return self
@@ -115,7 +120,7 @@ class AssetSchema(BaseModel):
     remote_url: str | None
     operating_system: str | None
     access_instructions: str | None
-    webex_room_id: str | None
+    room_notifications_enabled: bool
     created_at: datetime
     updated_at: datetime
     archived_at: datetime | None

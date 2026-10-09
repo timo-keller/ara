@@ -12,7 +12,7 @@ export interface AssetDraftPayload {
   remote_url: string | null;
   operating_system: string | null;
   access_instructions: string | null;
-  webex_room_id: string | null;
+  room_notifications_enabled: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

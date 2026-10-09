@@ -16,6 +16,7 @@ from ara.api.schemas.reservations import (
     ReservationListSchema,
     ReservationSchema,
 )
+from ara.core.config import Settings, get_settings
 from ara.core.errors import DomainError
 from ara.domain.models import User
 from ara.infrastructure.database import get_session
@@ -40,10 +41,11 @@ async def create_reservation(
     _csrf: Annotated[None, Depends(require_csrf)],
     audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session, audit).create_for_current_user(
-        roles, user_id=user.id, **payload.model_dump()
-    )
+    reservation = await ReservationService(
+        session, audit, settings
+    ).create_for_current_user(roles, user_id=user.id, **payload.model_dump())
     return _reservation_schema(reservation)
 
 
@@ -75,8 +77,9 @@ async def return_reservation(
     _csrf: Annotated[None, Depends(require_csrf)],
     audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ReservationSchema:
-    reservation = await ReservationService(session, audit).return_own(
+    reservation = await ReservationService(session, audit, settings).return_own(
         roles, actor_id=user.id, reservation_id=reservation_id
     )
     return _reservation_schema(reservation)

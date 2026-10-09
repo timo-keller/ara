@@ -159,6 +159,8 @@ class Group(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column(Text)
+    webex_room_id: Mapped[str | None] = mapped_column(String(255))
+    webex_space_link: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         nullable=False,
@@ -244,7 +246,9 @@ class Asset(Base):
     remote_url: Mapped[str | None] = mapped_column(String(2048))
     operating_system: Mapped[str | None] = mapped_column(String(255))
     access_instructions: Mapped[str | None] = mapped_column(Text)
-    webex_room_id: Mapped[str | None] = mapped_column(String(255))
+    room_notifications_enabled: Mapped[bool] = mapped_column(
+        nullable=False, default=True, server_default="1"
+    )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         nullable=False,
@@ -285,6 +289,12 @@ class Reservation(Base):
         UUID, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     starts_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    personal_start_eligible: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="0"
+    )
+    start_notification_processed: Mapped[bool] = mapped_column(
+        nullable=False, default=True, server_default="1"
+    )
     ends_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     status: Mapped[ReservationStatus] = mapped_column(
         SqlEnum(
@@ -354,6 +364,48 @@ class Notification(Base):
     user: Mapped[User] = relationship(back_populates="notifications")
     reservation: Mapped[Reservation | None] = relationship(
         back_populates="notifications"
+    )
+
+
+class WebexDelivery(Base):
+    """Durable outbound bot message; credentials never belong in this table."""
+
+    __tablename__ = "webex_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "event_key", "destination_type", name="uq_webex_event_destination"
+        ),
+        Index("ix_webex_dispatch", "state", "next_attempt_at"),
+        Index("ix_webex_group_created", "group_id", "created_at"),
+        Index("ix_webex_reservation_event", "reservation_id", "kind", "expected_end"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("groups.id", ondelete="RESTRICT"), nullable=False
+    )
+    asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID, ForeignKey("assets.id", ondelete="RESTRICT")
+    )
+    reservation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID, ForeignKey("reservations.id", ondelete="RESTRICT")
+    )
+    event_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    kind: Mapped[str] = mapped_column(String(50), nullable=False)
+    destination_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    destination: Mapped[str | None] = mapped_column(String(320))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    scheduled_for: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    delivered_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    message_id: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, nullable=False, default=utc_now
     )
 
 

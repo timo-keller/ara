@@ -128,7 +128,7 @@ Assets are archived rather than deleted. Archived assets remain visible in
 history and audit views, cannot be newly reserved, and are hidden from normal
 asset lists by default. An authorized administrator can reactivate them.
 
-The planned Webex integration stores a room identifier per group and a
+The Webex integration stores a room identifier per group and a
 room-notification toggle per asset. The bot credential is a deployment secret
 and is not stored on an asset or group.
 
@@ -296,7 +296,7 @@ Periodic jobs include:
 - identifying due reservation notifications
 - updating or deriving expired reservation state where necessary
 - deleting audit events beyond the one-year retention period
-- later, dispatching queued Webex messages
+- generating due Webex events and dispatching queued messages
 
 Jobs use coalescing, `max_instances=1`, and a bounded misfire grace period.
 Business state and delivery state are persisted in SQLite; APScheduler memory
@@ -313,7 +313,7 @@ Reservations without an end time cannot produce end-of-reservation reminders.
 Reminder offsets must be configurable rather than embedded in frontend code.
 
 Web Push for notifications while ARA is closed is not part of the initial
-decision. The planned Webex bot integration sends end reminders directly to the
+decision. The Webex bot integration sends end reminders directly to the
 reserving user's OIDC email. Personal start messages are sent only when a
 reservation originally scheduled for the future begins, never for immediate or
 past-requested starts.
@@ -323,16 +323,22 @@ Webex rooms are configured per group rather than per asset. An asset-level
 delivery. Rooms receive reservation-start messages (including immediate starts)
 and explicit asset-return messages, not cancellation or elapsed-end messages.
 Room messages include the asset, reserving user, event time, and an ARA link.
-Existing asset room settings will be discarded when the schema changes.
+Existing asset room settings are discarded by the Webex schema migration.
 Group administration provides room configuration, test send, and basic room
 delivery status, scoped to the responsible administrators.
+Administrators configure rooms using `webexteams://im?space=<UUID>` links after
+adding ARA Notification Bot. The backend resolves only group spaces visible to
+the bot and persists the canonical Webex room ID together with the display link.
+Resolution is bounded to 20 trusted API pages and 30 seconds, outside the SQLite
+write transaction. Failed lookups preserve previous settings; clearing the link
+disables room delivery. Existing group room-ID configurations remain supported.
 
 Delivery attempts use a persisted outbox with unique event/destination keys,
 retry state, and restart recovery. Local queueing is idempotent. Remote delivery
 cannot be promised exactly once: retries after an ambiguous timeout or a crash
 after acceptance by Webex may duplicate a message. Webex remains optional and
-independent of browser notification read state. Ticket 035 records the detailed
-plan and verification requirements.
+independent of browser notification read state. Resolved ticket 035 records the
+delivery design, operational defaults, and verification results.
 
 ## 15. Frontend
 
@@ -456,6 +462,5 @@ The following capabilities are intentionally deferred:
 - PostgreSQL and horizontally scaled API instances
 - a separate scheduler or task-queue service
 - Web Push while the application is closed
-- Webex bot delivery
 - storage or disclosure of remote-system credentials
 - approval workflows for reservations

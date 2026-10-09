@@ -173,19 +173,16 @@
             rejected.</span
           >
         </syn-textarea>
-        <syn-combobox
-          label="Webex room identifier"
-          clearable
-          [value]="draft().webex_room_id || ''"
-          (valueChange)="changeWebexRoomId($event)"
+        <syn-checkbox
+          [checked]="draft().room_notifications_enabled"
+          (checkedChange)="changeRoomNotifications($event)"
         >
+          Send group-room notifications
           <span slot="help-text"
-            ><strong>Optional</strong> room identifier supported by the current API.</span
+            >Announce reservation starts and returns in the group's Webex room. Personal reminders
+            are independent.</span
           >
-          @for (roomId of webexRoomIdSuggestions(); track roomId) {
-            <syn-option [value]="roomId">{{ roomId }}</syn-option>
-          }
-        </syn-combobox>
+        </syn-checkbox>
         <syn-button type="submit" variant="filled">{{
           draft().id ? 'Save asset' : 'Create asset'
         }}</syn-button>

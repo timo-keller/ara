@@ -4,6 +4,7 @@ import { SynAlertComponent } from '@synergy-design-system/angular/components/ale
 import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
 import { SynButtonComponent } from '@synergy-design-system/angular/components/button';
 import { SynCardComponent } from '@synergy-design-system/angular/components/card';
+import { SynCheckboxComponent } from '@synergy-design-system/angular/components/checkbox';
 import { SynComboboxComponent } from '@synergy-design-system/angular/components/combobox';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
 import { SynOptionComponent } from '@synergy-design-system/angular/components/option';
@@ -33,7 +34,7 @@ const emptyDraft = (): AssetDraft => ({
   remote_url: null,
   operating_system: null,
   access_instructions: null,
-  webex_room_id: null,
+  room_notifications_enabled: true,
 });
 
 @Component({
@@ -42,6 +43,7 @@ const emptyDraft = (): AssetDraft => ({
     SynBadgeComponent,
     SynButtonComponent,
     SynCardComponent,
+    SynCheckboxComponent,
     SynComboboxComponent,
     SynInputComponent,
     SynOptionComponent,
@@ -110,16 +112,6 @@ export class AssetAdministrationPage {
       !this.filteredManageableAssets().some((asset) => asset.id === selectedId)
     );
   });
-  readonly webexRoomIdSuggestions = computed(() => {
-    const groupId = this.draft().group_id;
-    const suggestions = new Map<string, string>();
-    for (const asset of this.manageableAssets()) {
-      if (asset.group_id !== groupId) continue;
-      const roomId = asset.webex_room_id?.trim();
-      if (roomId && !suggestions.has(roomId)) suggestions.set(roomId, roomId);
-    }
-    return [...suggestions.values()];
-  });
 
   constructor() {
     this.load();
@@ -174,8 +166,8 @@ export class AssetAdministrationPage {
     this.assetTypeFilter.set(Array.isArray(value) ? String(value[0] ?? '') : String(value));
   }
 
-  changeWebexRoomId(value: string | number | (string | number)[]): void {
-    this.change('webex_room_id', Array.isArray(value) ? String(value[0] ?? '') : String(value));
+  changeRoomNotifications(enabled: boolean): void {
+    this.draft.update((draft) => ({ ...draft, room_notifications_enabled: enabled }));
   }
 
   edit(asset: Asset): void {
@@ -263,7 +255,7 @@ export class AssetAdministrationPage {
       remote_url: this.nullable(draft.remote_url),
       operating_system: this.nullable(draft.operating_system),
       access_instructions: this.nullable(draft.access_instructions),
-      webex_room_id: this.nullable(draft.webex_room_id),
+      room_notifications_enabled: draft.room_notifications_enabled,
     };
   }
 

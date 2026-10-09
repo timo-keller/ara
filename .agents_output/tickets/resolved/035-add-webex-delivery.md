@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned. Requirements confirmed; implementation pending.
+Resolved. Implemented and verified on 2026-10-09.
 
 ## Goal
 
@@ -39,7 +39,7 @@ Webex bot, plus reservation-start and asset-return messages to group rooms.
   controls room messages only; personal messages remain independent.
 - Add test send and basic delivery status in group administration.
 
-### Proposed delivery design
+### Delivery design
 
 - Read an optional bot token from a Docker secret through
   `ARA_WEBEX_BOT_TOKEN_FILE`; represent it as a redacted secret. Keep Webex
@@ -99,13 +99,39 @@ Webex bot, plus reservation-start and asset-return messages to group rooms.
 5. **Verification:** Exercise migration, authorization, event timing, retry and
    restart behavior, and frontend flows; document setup and troubleshooting.
 
-### Details to settle during implementation
+### Implemented defaults and administration
 
-- Define a bounded catch-up window for scheduled starts after downtime so an
-  old start is not announced after the reservation has already ended.
-- Define outbox retention, retry limits, and dispatcher batch/interval defaults.
-- Confirm how group-room settings fit the existing group-edit authorization
-  model; retain Owner access and permit responsible Group Admins only.
+- Future starts catch up for at most one hour, excluding reservations already
+  ended. Existing future bookings are eligible after migration; current and
+  historical bookings do not generate rollout start messages.
+- End reminders catch up for at most 24 hours. Producers process up to 100
+  reservations per start batch or reminder offset, excluding already queued
+  reminders so later batches make progress.
+- Dispatch runs every 15 seconds with batches of 20 and at most six attempts.
+  Interrupted claims become eligible after five minutes. Invalid-token failures
+  impose a persisted global 15-minute cooldown; rate limits also pause dispatch.
+- Terminal outbox records are retained for 30 days and cleaned in batches of 100.
+- Dedicated group Webex endpoints permit Owners and responsible Group Admins.
+  Group creation, metadata/lifecycle edits, and role mappings remain Owner-only.
+- Production uses the opt-in `compose.webex.yaml` secret overlay; local launcher
+  opt-in is `ARA_DEV_WEBEX=1 ./run-dev.sh up`.
+
+### Verification
+
+- Backend: Ruff formatting/lint, ty, and all 113 tests passed. Coverage includes
+  populated migration, timing/destinations, terminal suppression, transactional
+  rollback, extension reminders, missing destinations, disabled integration,
+  retries/rate limits, restart recovery, batch progress, and scoped private API.
+- Frontend: lint, all 89 tests, development build, and production build passed.
+  Changed frontend files pass Prettier. The full repository format check reports
+  existing issues in `angular.json`, the reservations page spec, and ignored
+  generated Playwright output. Production build warns that the initial bundle
+  is 511.22 kB against a 500 kB warning budget.
+- Production and development Webex Compose configurations validated, and
+  `bash -n run-dev.sh` passed.
+- Focused Playwright end-to-end verification passed for Group Admin room editing,
+  disabled integration feedback, cross-group API denial, real CSRF enforcement,
+  and ordinary-user route denial.
 
 ## Acceptance Criteria
 

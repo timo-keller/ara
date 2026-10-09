@@ -286,6 +286,34 @@ test('group admin is scoped in the UI, API, and audit history while a user is de
   const scopedAudit = await csrfFetch(admin, `/api/audit-events?group_id=${bravoGroupId}`);
   expect(scopedAudit.status).toBe(200);
   expect(scopedAudit.body.items).toEqual([]);
+  await admin.goto(`${baseURL()}/administration`);
+  await expect(admin.getByRole('heading', { name: 'Group administration' })).toBeVisible();
+  await admin.getByRole('button', { name: 'Edit Alpha Lab', exact: true }).click();
+  await expect(admin.locator('syn-input[label="Group name"]')).toHaveCount(0);
+  await expect(admin.locator('.role-mappings')).toHaveCount(0);
+  await expect(admin.getByText('ARA Notification Bot', { exact: true })).toBeVisible();
+  await setSynInput(
+    admin,
+    'Webex space link',
+    'webexteams://im?space=c149af1a-71e9-4955-a2b0-9ca8b423b129',
+  );
+  await admin.getByRole('button', { name: 'Save space link', exact: true }).click();
+  await expect(
+    admin.getByText('Configure the ARA Notification Bot token on the server.', { exact: true }),
+  ).toBeVisible();
+  await setSynInput(admin, 'Webex space link', '');
+  await admin.getByRole('button', { name: 'Save space link', exact: true }).click();
+  await expect(admin.getByText('Room notifications disabled.', { exact: true })).toBeVisible();
+  await expect(admin.getByText('Webex delivery is disabled.', { exact: false })).toBeVisible();
+  const alphaGroups = await csrfFetch(admin, '/api/groups');
+  const alphaGroupId = alphaGroups.body.items.find((group) => group.name === 'Alpha Lab').id;
+  expect((await csrfFetch(admin, `/api/groups/${alphaGroupId}/webex`)).status).toBe(200);
+  expect((await csrfFetch(admin, `/api/groups/${bravoGroupId}/webex`)).status).toBe(403);
+  const missingCsrf = await admin.evaluate(async (groupId) => {
+    const response = await fetch(`/api/groups/${groupId}/webex/test`, { method: 'POST' });
+    return response.status;
+  }, alphaGroupId);
+  expect(missingCsrf).toBe(403);
   await adminContext.close();
 
   const userContext = await browser.newContext();
@@ -295,6 +323,8 @@ test('group admin is scoped in the UI, API, and audit history while a user is de
   await expect(user).toHaveURL(`${baseURL()}/reservations`);
   const auditDenied = await csrfFetch(user, '/api/audit-events');
   expect(auditDenied.status).toBe(403);
+  await user.goto(`${baseURL()}/administration`);
+  await expect(user).toHaveURL(`${baseURL()}/reservations`);
   await userContext.close();
 });
 

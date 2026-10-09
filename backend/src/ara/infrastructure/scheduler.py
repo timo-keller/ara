@@ -26,6 +26,7 @@ RESERVATION_REMINDER_INTERVAL_SECONDS = 60
 AUDIT_RETENTION_JOB_ID = "audit-retention"
 AUDIT_RETENTION_INTERVAL_DAYS = 1
 AUDIT_RETENTION_BATCH_SIZE = 100
+WEBEX_JOB_ID = "webex-delivery"
 
 
 def create_scheduler() -> AsyncIOScheduler:
@@ -107,6 +108,36 @@ def register_audit_retention_job(scheduler: AsyncIOScheduler) -> None:
     )
 
 
+async def process_webex(session: AsyncSession) -> int:
+    from ara.core.config import get_settings
+    from ara.infrastructure.webex import WebexClient
+    from ara.services.webex import WebexService
+
+    settings = get_settings()
+    service = WebexService(session, settings)
+    await service.generate_due()
+    if settings.webex_bot_token is None:
+        return 0
+    client = WebexClient(settings.webex_bot_token.get_secret_value())
+    try:
+        return await service.dispatch(client)
+    finally:
+        await client.close()
+
+
+async def run_webex_job() -> int:
+    return await run_scheduled_job(WEBEX_JOB_ID, process_webex)
+
+
+def register_webex_job(scheduler: AsyncIOScheduler) -> None:
+    for job in scheduler.get_jobs():
+        if job.id == WEBEX_JOB_ID:
+            scheduler.remove_job(job.id)
+    scheduler.add_job(
+        run_webex_job, "interval", seconds=15, id=WEBEX_JOB_ID, replace_existing=True
+    )
+
+
 async def run_scheduled_job[JobResult](
     job_id: str,
     job: Callable[[AsyncSession], Awaitable[JobResult]],
@@ -139,6 +170,7 @@ async def scheduler_lifespan(app: FastAPI) -> AsyncIterator[None]:
     scheduler = create_scheduler()
     register_reservation_reminder_job(scheduler)
     register_audit_retention_job(scheduler)
+    register_webex_job(scheduler)
     app.state.scheduler = scheduler
     scheduler.start()
     logging.getLogger("uvicorn.error").info("ARA scheduler started")

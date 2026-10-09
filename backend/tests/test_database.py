@@ -94,7 +94,7 @@ def test_alembic_upgrades_a_fresh_database(tmp_path: Path) -> None:
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             )
         }
-    assert version == ("0004_session_oidc_claims",)
+    assert version == ("0006_webex_space_link",)
     assert {
         "users",
         "groups",
@@ -104,6 +104,7 @@ def test_alembic_upgrades_a_fresh_database(tmp_path: Path) -> None:
         "notifications",
         "audit_events",
         "application_sessions",
+        "webex_deliveries",
     } <= tables
 
 
@@ -141,7 +142,47 @@ def test_alembic_downgrade_and_subsequent_upgrade(tmp_path: Path) -> None:
         version = connection.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchone()
-    assert version == ("0004_session_oidc_claims",)
+    assert version == ("0006_webex_space_link",)
+
+
+def test_webex_migration_discards_asset_rooms_and_preserves_reservations(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "migration.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite+aiosqlite:///{database_path}")
+    command.upgrade(config, "0004_session_oidc_claims")
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute("INSERT INTO groups (id, name) VALUES ('g', 'Lab')")
+        connection.execute(
+            "INSERT INTO users (id, oidc_issuer, oidc_subject) "
+            "VALUES ('u', 'issuer', 'subject')"
+        )
+        connection.execute(
+            "INSERT INTO assets (id, group_id, asset_type, name, webex_room_id) "
+            "VALUES ('a', 'g', 'device', 'Laptop', 'discard-me')"
+        )
+        connection.execute(
+            "INSERT INTO reservations (id, asset_id, user_id, starts_at) "
+            "VALUES ('past', 'a', 'u', '2020-01-01 10:00:00'), "
+            "('future', 'a', 'u', '2099-01-01 10:00:00')"
+        )
+        connection.commit()
+    command.upgrade(config, "head")
+    with closing(sqlite3.connect(database_path)) as connection:
+        assert "webex_room_id" not in {
+            row[1] for row in connection.execute("PRAGMA table_info(assets)")
+        }
+        assert connection.execute("SELECT webex_room_id FROM groups").fetchone() == (
+            None,
+        )
+        assert connection.execute(
+            "SELECT room_notifications_enabled FROM assets"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT id, personal_start_eligible, start_notification_processed "
+            "FROM reservations ORDER BY id"
+        ).fetchall() == [("future", 1, 0), ("past", 0, 1)]
 
 
 def test_core_schema_enforces_integrity_constraints(tmp_path: Path) -> None:

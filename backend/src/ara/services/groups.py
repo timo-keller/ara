@@ -5,9 +5,11 @@ import uuid
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ara.core.config import Settings
 from ara.core.errors import DomainError
 from ara.daos.groups import GroupDAO
 from ara.domain.models import Group, utc_now
+from ara.infrastructure.webex import WebexClient, resolution_error
 from ara.services.audit import (
     AuditAction,
     AuditContext,
@@ -16,6 +18,7 @@ from ara.services.audit import (
     group_snapshot,
 )
 from ara.services.authorization import AuthorizationService, EffectiveRoles
+from ara.services.webex_links import parse_space_link
 
 
 class GroupService:
@@ -33,10 +36,15 @@ class GroupService:
         self.audit = AuditService(session, audit_context)
 
     async def create(
-        self, actor_roles: EffectiveRoles, *, name: str, description: str | None
+        self,
+        actor_roles: EffectiveRoles,
+        *,
+        name: str,
+        description: str | None,
+        webex_room_id: str | None = None,
     ) -> Group:
         AuthorizationService.require_owner(actor_roles)
-        group = Group(name=name, description=description)
+        group = Group(name=name, description=description, webex_room_id=webex_room_id)
         self.groups.add(group)
         await self._commit(group, AuditAction.GROUP_CREATE, None)
         return group
@@ -122,6 +130,51 @@ class GroupService:
             before = group_snapshot(group)
             group.archived_at = utc_now()
             await self._commit(group, AuditAction.GROUP_ARCHIVE, before)
+        return group
+
+    async def update_webex(
+        self,
+        actor_roles: EffectiveRoles,
+        group_id: uuid.UUID,
+        room_id: str | None,
+        *,
+        space_link: str | None = None,
+        resolve_link: bool = False,
+        settings: Settings | None = None,
+    ) -> Group:
+        AuthorizationService.require_group_admin(actor_roles, group_id)
+        group = await self._get_required(group_id)
+        if group.archived_at is not None:
+            raise DomainError(
+                "group_archived",
+                "Reactivate the group before changing its room",
+                status_code=409,
+            )
+        if resolve_link and space_link:
+            identifier, space_link = parse_space_link(space_link)
+            if settings is None or settings.webex_bot_token is None:
+                raise resolution_error("missing_bot_token")
+            # Role resolution may have staged session changes. End the read
+            # transaction before doing network I/O; re-read archive state after.
+            await self.session.rollback()
+            client = WebexClient(settings.webex_bot_token.get_secret_value())
+            try:
+                room_id = await client.resolve_space(identifier)
+            finally:
+                await client.close()
+            group = await self._get_required(group_id)
+            if group.archived_at is not None:
+                raise DomainError(
+                    "group_archived",
+                    "Reactivate the group before changing its room",
+                    status_code=409,
+                )
+        elif resolve_link:
+            room_id, space_link = None, None
+        before = group_snapshot(group)
+        group.webex_room_id = room_id
+        group.webex_space_link = space_link
+        await self._commit(group, AuditAction.GROUP_UPDATE, before)
         return group
 
     async def reactivate(

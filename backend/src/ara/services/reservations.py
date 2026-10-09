@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ara.core.config import Settings
 from ara.core.errors import DomainError
 from ara.daos.assets import AssetDAO
 from ara.daos.groups import GroupDAO
@@ -26,13 +27,17 @@ from ara.services.audit import (
     reservation_snapshot,
 )
 from ara.services.authorization import AuthorizationService, EffectiveRoles
+from ara.services.webex import WebexService
 
 
 class ReservationService:
     """Own reservation interval rules and SQLite write transactions."""
 
     def __init__(
-        self, session: AsyncSession, audit_context: AuditContext | None = None
+        self,
+        session: AsyncSession,
+        audit_context: AuditContext | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.session = session
         self.reservations = ReservationDAO(session)
@@ -40,6 +45,7 @@ class ReservationService:
         self.groups = GroupDAO(session)
         self.users = UserDAO(session)
         self.audit = AuditService(session, audit_context)
+        self.webex = WebexService(session, settings) if settings is not None else None
 
     async def create(
         self,
@@ -59,6 +65,7 @@ class ReservationService:
         self._validate_interval(starts_at, ends_at)
         await self._begin_immediate()
         try:
+            now = utc_now()
             asset = await self._get_asset_required(asset_id)
             await self.ensure_available(
                 asset_id=asset_id, starts_at=starts_at, ends_at=ends_at
@@ -68,9 +75,15 @@ class ReservationService:
                 user_id=user_id,
                 starts_at=starts_at,
                 ends_at=ends_at,
+                personal_start_eligible=starts_at > now,
+                start_notification_processed=starts_at <= now,
             )
             self.reservations.add(reservation)
             await self.session.flush()
+            if self.webex is not None and reservation.start_notification_processed:
+                await self.webex.enqueue_event(
+                    reservation, "start", starts_at, room=True
+                )
             self.audit.record(
                 action=AuditAction.RESERVATION_CREATE,
                 group_id=asset.group_id,
@@ -116,9 +129,15 @@ class ReservationService:
                 user_id=user.id,
                 starts_at=effective_starts_at,
                 ends_at=ends_at,
+                personal_start_eligible=starts_at > now,
+                start_notification_processed=starts_at <= now,
             )
             self.reservations.add(reservation)
             await self.session.flush()
+            if self.webex is not None and reservation.start_notification_processed:
+                await self.webex.enqueue_event(
+                    reservation, "start", effective_starts_at, room=True
+                )
             self.audit.record(
                 action=AuditAction.RESERVATION_CREATE,
                 group_id=group.id,
@@ -272,6 +291,8 @@ class ReservationService:
             before = reservation_snapshot(reservation)
             reservation.status = ReservationStatus.RETURNED
             reservation.returned_at = now
+            if self.webex is not None:
+                await self.webex.enqueue_event(reservation, "return", now, room=True)
             # An elapsed end is historical schedule data. Current reservations
             # retain the established early-return behavior instead.
             if reservation.ends_at is None or reservation.ends_at > now:
