@@ -88,7 +88,11 @@
               </td>
               <td data-label="Asset type" headers="asset-type">{{ asset.asset_type }}</td>
               <td data-label="Description" headers="asset-description">
-                {{ asset.description || 'No description provided.' }}
+                {{
+                  asset.description && asset.description.length > 50
+                    ? asset.description.slice(0, 50) + '...'
+                    : asset.description || 'No description provided.'
+                }}
               </td>
               <td data-label="Availability" headers="asset-availability">
                 {{
