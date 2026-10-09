@@ -9,6 +9,7 @@ import { SynInputComponent } from '@synergy-design-system/angular/components/inp
 import { SynOptionComponent } from '@synergy-design-system/angular/components/option';
 import { SynPaginationComponent } from '@synergy-design-system/angular/components/pagination';
 import { SynSpinnerComponent } from '@synergy-design-system/angular/components/spinner';
+import { ToastService } from '../../core/notifications/toast.service';
 import {
   Reservation,
   ReservationFilters,
@@ -142,13 +143,12 @@ export function utcToLocalDateTime(value: string): string {
 })
 export class ReservationsPage {
   private readonly catalogue = inject(AssetCatalogueService);
+  private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly reservations = signal<Reservation[]>([]);
   readonly total = signal(0);
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
-  readonly error = signal('');
-  readonly success = signal('');
   readonly pendingAction = signal<{ action: Action; reservation: Reservation } | null>(null);
   readonly extensionFor = signal<Reservation | null>(null);
   readonly extensionEnd = signal('');
@@ -239,20 +239,19 @@ export class ReservationsPage {
   openExtension(reservation: Reservation): void {
     this.extensionFor.set(reservation);
     this.extensionEnd.set('');
-    this.error.set('');
   }
 
   extend(): void {
     const reservation = this.extensionFor();
     const ends_at = localDateTimeToUtc(this.extensionEnd());
     if (!reservation || !ends_at) {
-      this.error.set('Enter a valid local end time.');
+      this.toast.error('Enter a valid local end time.');
       return;
     }
     this.catalogue.extendReservation(reservation.id, { ends_at }).subscribe({
       next: () => {
         this.extensionFor.set(null);
-        this.success.set('Reservation extended and availability refreshed.');
+        this.toast.success('Reservation extended and availability refreshed.');
         this.load();
       },
       error: (error: unknown) => this.handleMutationError(error),
@@ -273,7 +272,7 @@ export class ReservationsPage {
         : this.catalogue.cancelReservation(pending.reservation.id);
     request.subscribe({
       next: () => {
-        this.success.set(
+        this.toast.success(
           pending.action === 'return'
             ? 'Asset returned and availability refreshed.'
             : 'Reservation cancelled and availability refreshed.',
@@ -287,7 +286,7 @@ export class ReservationsPage {
   private handleMutationError(error: unknown, reload = false): void {
     const body = (error as { error?: { error?: { code?: string; message?: string } } }).error
       ?.error;
-    this.error.set(
+    this.toast.error(
       body?.code === 'reservation_conflict'
         ? 'That change conflicts with the current schedule. Review the asset schedule and choose an earlier end.'
         : body?.message || 'The reservation could not be changed. Refresh and try again.',

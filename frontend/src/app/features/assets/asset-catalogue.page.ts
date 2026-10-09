@@ -8,6 +8,7 @@ import { SynOptionComponent } from '@synergy-design-system/angular/components/op
 import { SynPaginationComponent } from '@synergy-design-system/angular/components/pagination';
 import { SynSelectComponent } from '@synergy-design-system/angular/components/select';
 import { SynSpinnerComponent } from '@synergy-design-system/angular/components/spinner';
+import { ToastService } from '../../core/notifications/toast.service';
 import {
   AssetCatalogueService,
   AssetFilters,
@@ -64,6 +65,7 @@ export function assetQueryParams(filters: AssetFilters): Params {
 })
 export class AssetCataloguePage {
   private readonly catalogue = inject(AssetCatalogueService);
+  private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private loadVersion = 0;
@@ -72,8 +74,6 @@ export class AssetCataloguePage {
   readonly total = signal(0);
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   readonly bookingAssetId = signal<string | null>(null);
-  readonly bookingError = signal('');
-  readonly bookingSuccess = signal('');
   readonly schedules = signal<Record<string, Reservation[]>>({});
   readonly bookingDurations = QUICK_BOOKING_DURATIONS;
   readonly filters = signal<AssetFilters>({
@@ -140,8 +140,6 @@ export class AssetCataloguePage {
     if (asset.availability !== 'available' || this.bookingAssetId()) return;
     if (!this.canBookNow(asset, hours)) return;
     const start = new Date();
-    this.bookingError.set('');
-    this.bookingSuccess.set('');
     this.bookingAssetId.set(asset.id);
     this.catalogue
       .createReservation({
@@ -153,14 +151,14 @@ export class AssetCataloguePage {
         next: () => {
           this.bookingAssetId.set(null);
           const duration = QUICK_BOOKING_DURATIONS.find((option) => option.hours === hours)?.label;
-          this.bookingSuccess.set(`${asset.name} booked for ${duration}.`);
+          this.toast.success(`${asset.name} booked for ${duration}.`);
           this.load();
         },
         error: (error: unknown) => {
           this.bookingAssetId.set(null);
           const body = (error as { error?: { error?: { code?: string; message?: string } } }).error
             ?.error;
-          this.bookingError.set(
+          this.toast.error(
             body?.code === 'reservation_conflict'
               ? `Could not book ${asset.name}: another reservation overlaps this period. Try a shorter duration or view the asset's schedule.`
               : body?.message || `Could not book ${asset.name}. Please try again.`,

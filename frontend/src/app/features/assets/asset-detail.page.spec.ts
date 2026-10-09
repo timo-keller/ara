@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ToastService } from '../../core/notifications/toast.service';
 import { AssetDetailPage, localDateTimeToUtc, reservationPayload } from './asset-detail.page';
 
 describe('asset detail quick booking', () => {
@@ -15,6 +16,7 @@ describe('asset detail quick booking', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
         {
           provide: ActivatedRoute,
           useValue: { snapshot: { paramMap: new Map([['assetId', 'asset']]) } },
@@ -71,7 +73,10 @@ describe('asset detail quick booking', () => {
     request.flush({ id: 'reservation' });
     http.expectOne('/api/assets/asset').flush(asset);
     http.expectOne('/api/assets/asset/reservations?limit=10').flush({ items: [] });
-    expect(fixture.componentInstance.reservationSuccess()).toContain('Reservation created');
+    expect(TestBed.inject(ToastService).success).toHaveBeenCalledWith(
+      'Reservation created and availability refreshed.',
+    );
+    expect(fixture.nativeElement.querySelector('syn-alert[variant="success"]')).toBeNull();
     http.verify();
   });
 });

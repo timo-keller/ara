@@ -31,6 +31,7 @@
   box-sizing: border-box;
   flex: 1 1 auto;
   min-height: 0;
+  padding-block-start: calc(var(--syn-spacing-2x-large) / 2);
 }
 
 .authentication-state {
@@ -84,6 +85,10 @@
   .authentication-state {
     margin: var(--syn-spacing-medium);
     padding: var(--syn-spacing-large);
+  }
+
+  .appshell-main {
+    padding-block-start: calc(var(--syn-spacing-large) / 2);
   }
 
   syn-side-nav {

@@ -8,6 +8,7 @@ import { SynCardComponent } from '@synergy-design-system/angular/components/card
 import { SynDialogComponent } from '@synergy-design-system/angular/components/dialog';
 import { SynInputComponent } from '@synergy-design-system/angular/components/input';
 import { SynSpinnerComponent } from '@synergy-design-system/angular/components/spinner';
+import { ToastService } from '../../core/notifications/toast.service';
 import {
   Asset,
   AssetCatalogueService,
@@ -50,6 +51,7 @@ export function reservationPayload(
 })
 export class AssetDetailPage {
   private readonly catalogue = inject(AssetCatalogueService);
+  private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   readonly asset = signal<Asset | null>(null);
   readonly reservations = signal<Reservation[]>([]);
@@ -57,8 +59,6 @@ export class AssetDetailPage {
   readonly startsAt = signal('');
   readonly endsAt = signal('');
   readonly openEndedConfirmationOpen = signal(false);
-  readonly reservationError = signal('');
-  readonly reservationSuccess = signal('');
   readonly reserving = signal(false);
   readonly bookingDurations = QUICK_BOOKING_DURATIONS;
 
@@ -120,7 +120,7 @@ export class AssetDetailPage {
     const current = this.asset();
     const payload = current && reservationPayload(current.id, this.startsAt(), this.endsAt());
     if (!payload) {
-      this.reservationError.set('Enter a valid local start time and, when used, end time.');
+      this.toast.error('Enter a valid local start time and, when used, end time.');
       return;
     }
     if (!payload.ends_at) {
@@ -143,18 +143,16 @@ export class AssetDetailPage {
 
   private createReservation(payload: ReservationCreate): void {
     if (this.reserving()) return;
-    this.reservationError.set('');
-    this.reservationSuccess.set('');
     this.reserving.set(true);
     this.catalogue.createReservation(payload).subscribe({
       next: () => {
         this.reserving.set(false);
-        this.reservationSuccess.set('Reservation created. The schedule below has been refreshed.');
+        this.toast.success('Reservation created and availability refreshed.');
         this.load();
       },
       error: (error: unknown) => {
         this.reserving.set(false);
-        this.reservationError.set(this.reservationErrorMessage(error));
+        this.toast.error(this.reservationErrorMessage(error));
         const body = (error as { error?: { error?: { code?: string } } }).error?.error;
         if (body?.code === 'reservation_conflict') this.load();
       },

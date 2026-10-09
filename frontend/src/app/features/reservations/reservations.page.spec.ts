@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { ToastService } from '../../core/notifications/toast.service';
 import {
   allowedReservationActions,
   localReservationTime,
@@ -41,7 +42,12 @@ describe('ReservationsPage', () => {
   beforeEach(async () => {
     globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
     await TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
   });
@@ -92,7 +98,38 @@ describe('ReservationsPage', () => {
     fixture.componentInstance.performConfirmedAction();
     http.expectOne('/api/reservations/one/cancel').flush({ ...active, status: 'cancelled' });
     http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({ items: [], total: 0 });
-    expect(fixture.componentInstance.success()).toContain('cancelled');
+    expect(TestBed.inject(ToastService).success).toHaveBeenCalledWith(
+      'Reservation cancelled and availability refreshed.',
+    );
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('syn-alert[variant="success"]')).toBeNull();
+  });
+
+  it('shows cancellation errors as toasts', () => {
+    const fixture = TestBed.createComponent(ReservationsPage);
+    fixture.detectChanges();
+    http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({ items: [active], total: 1 });
+    fixture.componentInstance.confirm('cancel', active);
+    fixture.componentInstance.performConfirmedAction();
+    http
+      .expectOne('/api/reservations/one/cancel')
+      .flush(
+        {
+          error: {
+            code: 'reservation_not_future',
+            message: 'Only future reservations can be cancelled',
+          },
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      'Only future reservations can be cancelled',
+    );
+    expect(TestBed.inject(ToastService).success).not.toHaveBeenCalled();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Only future reservations can be cancelled',
+    );
   });
 
   it('reconciles a stale expired return without an optimistic lifecycle change', () => {
@@ -119,7 +156,9 @@ describe('ReservationsPage', () => {
       items: [{ ...expired, status: 'returned', lifecycle: 'returned' }],
       total: 1,
     });
-    expect(fixture.componentInstance.error()).toContain('Terminal reservations');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      'Terminal reservations cannot be changed',
+    );
   });
 
   it('turns conflicts into schedule guidance and reloads reservations', () => {
@@ -136,7 +175,9 @@ describe('ReservationsPage', () => {
         { status: 409, statusText: 'Conflict' },
       );
     http.expectOne('/api/reservations/mine?offset=0&limit=10').flush({ items: [active], total: 1 });
-    expect(fixture.componentInstance.error()).toContain('current schedule');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      expect.stringContaining('current schedule'),
+    );
   });
 
   it('renders a responsive table and sends page changes through route state', () => {

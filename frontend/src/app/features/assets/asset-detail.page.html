@@ -17,12 +17,6 @@
       <syn-badge>{{ current.asset_type }}</syn-badge>
     </p>
     <p>{{ current.description || 'No description provided.' }}</p>
-    @if (reservationSuccess()) {
-      <syn-alert open variant="success" aria-live="polite">{{ reservationSuccess() }}</syn-alert>
-    }
-    @if (reservationError()) {
-      <syn-alert open variant="error" aria-live="assertive">{{ reservationError() }}</syn-alert>
-    }
     <div class="detail-grid">
       <syn-card
         ><h2 slot="header">Remote access</h2>

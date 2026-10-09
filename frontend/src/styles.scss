@@ -8,6 +8,7 @@ body {
 
 /* Keep route titles close to their introduction while leaving component internals alone. */
 .route-page > h1 {
+  margin-block-start: 0.335em;
   margin-block-end: var(--syn-spacing-small);
 }
 

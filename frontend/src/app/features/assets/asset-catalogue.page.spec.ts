@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { ToastService } from '../../core/notifications/toast.service';
 import {
   AssetCataloguePage,
   assetFiltersFromQuery,
@@ -13,7 +14,12 @@ describe('AssetCataloguePage', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
   });
@@ -171,7 +177,10 @@ describe('AssetCataloguePage', () => {
       limit: 10,
     });
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain(`Available asset booked for ${label}.`);
+    expect(TestBed.inject(ToastService).success).toHaveBeenCalledWith(
+      `Available asset booked for ${label}.`,
+    );
+    expect(fixture.nativeElement.querySelector('syn-alert[variant="success"]')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('table syn-button')).toHaveLength(0);
   });
 
@@ -200,7 +209,9 @@ describe('AssetCataloguePage', () => {
       limit: 10,
     });
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('another reservation overlaps this period');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      expect.stringContaining('another reservation overlaps this period'),
+    );
     expect(fixture.componentInstance.bookingAssetId()).toBeNull();
   });
 

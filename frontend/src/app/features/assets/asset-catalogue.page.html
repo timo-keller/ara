@@ -53,12 +53,6 @@
     </syn-select>
   </form>
 
-  @if (bookingSuccess()) {
-    <syn-alert open variant="success" aria-live="polite">{{ bookingSuccess() }}</syn-alert>
-  }
-  @if (bookingError()) {
-    <syn-alert open variant="error" aria-live="assertive">{{ bookingError() }}</syn-alert>
-  }
   @if (state() === 'loading') {
     <div class="state" aria-live="polite">
       <syn-spinner></syn-spinner><span>Loading assets…</span>
