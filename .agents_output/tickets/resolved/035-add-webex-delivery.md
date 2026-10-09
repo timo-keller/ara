@@ -113,8 +113,10 @@ Webex bot, plus reservation-start and asset-return messages to group rooms.
 - Terminal outbox records are retained for 30 days and cleaned in batches of 100.
 - Dedicated group Webex endpoints permit Owners and responsible Group Admins.
   Group creation, metadata/lifecycle edits, and role mappings remain Owner-only.
-- Production uses the opt-in `compose.webex.yaml` secret overlay; local launcher
-  opt-in is `ARA_DEV_WEBEX=1 ./run-dev.sh up`.
+- Production uses the opt-in `compose.webex.yaml` secret overlay; the local
+  launcher automatically includes it when the configured bot-token file exists.
+  It checks `secrets/webex_bot_token` with a `.dev/secrets/webex_bot_token`
+  fallback, or an explicitly configured source path, without an enablement flag.
 
 ### Verification
 

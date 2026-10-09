@@ -8,9 +8,6 @@ operation=${1:-up}
 dev=.dev
 env_file=$dev/dev.env
 app_compose=(docker compose --project-name ara-dev --env-file "$env_file" -f compose.yaml -f compose.dev.yaml)
-if [[ ${ARA_DEV_WEBEX:-0} == 1 ]]; then
-  app_compose+=(-f compose.webex.yaml)
-fi
 kc_compose=(docker compose --project-name ara-dev-keycloak --env-file "$env_file" -f compose.keycloak.dev.yaml)
 
 die() { printf 'run-dev: %s\n' "$*" >&2; exit 1; }
@@ -20,6 +17,18 @@ run() { timeout "$short_timeout" "$@"; }
 app() { run "${app_compose[@]}" "$@"; }
 kc() { run "${kc_compose[@]}" "$@"; }
 require_tools() { command -v docker >/dev/null || die 'Docker Compose is required'; run docker compose version >/dev/null || die 'Docker Compose v2 is required'; command -v openssl >/dev/null || die 'openssl is required'; command -v curl >/dev/null || die 'curl is required'; command -v python3 >/dev/null || die 'python3 is required'; command -v timeout >/dev/null || die 'timeout is required'; }
+configure_webex() {
+  local token_file
+  # Let Compose resolve the optional source path, including dev.env/host
+  # overrides, without sourcing dev.env or reading the token itself.
+  token_file=$(run "${app_compose[@]}" -f compose.webex.yaml config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["secrets"]["webex_bot_token"]["file"])')
+  if [[ -f $token_file ]]; then
+    app_compose+=(-f compose.webex.yaml)
+  elif [[ $token_file == "$root/secrets/webex_bot_token" && -f $dev/secrets/webex_bot_token ]]; then
+    # Development-only secrets may live beside the other generated credentials.
+    app_compose=(env "ARA_WEBEX_BOT_TOKEN_FILE=$root/$dev/secrets/webex_bot_token" "${app_compose[@]}" -f compose.webex.yaml)
+  fi
+}
 diagnostics() { app ps || true; kc ps || true; app logs --tail=80 || true; kc logs --tail=80 || true; }
 trap 'result=$?; diagnostics; exit "$result"' ERR
 wait_for() { local description=$1 command=$2 deadline=$((SECONDS + 180)) remaining attempt; while (( SECONDS < deadline )); do remaining=$((deadline - SECONDS)); attempt=$((remaining < 5 ? remaining : 5)); timeout --foreground --kill-after=2s "${attempt}s" bash -c "$command" >/dev/null 2>&1 && return; sleep 2; done; diagnostics; die "timed out waiting for $description"; }
@@ -67,13 +76,14 @@ mapper={'name':'realm roles in ID token','protocol':'openid-connect','protocolMa
 realm={'realm':'ara-dev','enabled':True,'roles':{'realm':[{'name':r} for r in ('ara-owner','ara-group-admin','ara-user')]},'users':[{'username':u,'firstName':u.replace('-',' ').title(),'lastName':'Developer','enabled':True,'email':e,'emailVerified':True,'requiredActions':[],'realmRoles':[r],'credentials':[{'type':'password','value':secret(p),'temporary':False}]} for u,e,r,p in users]}
 (d/'keycloak'/'ara-dev-realm.json').write_text(json.dumps(realm), encoding='utf8')
 PY
+  configure_webex
 }
 
 network_up() { run docker network inspect ara-dev-oidc-backchannel >/dev/null 2>&1 || run docker network create --internal ara-dev-oidc-backchannel >/dev/null; }
 up() { prepare; network_up; local port=${ARA_DEV_KEYCLOAK_PORT:-8080}; timeout "$build_timeout" "${kc_compose[@]}" up -d; wait_for Keycloak "curl --max-time 5 -fsS http://127.0.0.1:${port}/realms/ara-dev/.well-known/openid-configuration"; run python3 deployment/scripts/configure-dev-keycloak.py "$dev"; timeout "$build_timeout" "${app_compose[@]}" up --build -d; wait_for application "curl --max-time 5 -kfsS https://localhost/api/health/ready"; app exec -T backend python - < deployment/scripts/seed-dev.py; printf '\nARA: https://localhost\nLocal-only credentials:\n  owner | owner@example.com | %s\n  group-admin | group-admin@example.com | %s\n  user | user@example.com | %s\nKeycloak: http://localhost:%s\nKeycloak admin: admin | %s\n' "$(<.dev/secrets/owner_password)" "$(<.dev/secrets/group_admin_password)" "$(<.dev/secrets/user_password)" "$port" "$(<.dev/secrets/keycloak_admin_password)"; }
 status() { prepare; app ps; kc ps; }
 logs() { prepare; app logs --tail=100 "${@:2}"; kc logs --tail=100; }
-down() { [[ -f $env_file ]] || exit 0; app down --remove-orphans; kc down; run docker network rm ara-dev-oidc-backchannel >/dev/null 2>&1 || true; }
+down() { [[ -f $env_file ]] || exit 0; configure_webex; app down --remove-orphans; kc down; run docker network rm ara-dev-oidc-backchannel >/dev/null 2>&1 || true; }
 reset() { [[ ${ARA_DEV_RESET_CONFIRM:-} == YES ]] || die 'reset removes .dev and ara-dev-keycloak-data; rerun with ARA_DEV_RESET_CONFIRM=YES'; down; run docker volume rm ara-dev-keycloak-data >/dev/null 2>&1 || true; rm -rf "$dev"; }
  test() { up; run deployment/scripts/verify-compose.sh "$env_file"; local port=${ARA_DEV_KEYCLOAK_PORT:-8080}; curl --max-time 20 -kfsS https://localhost/api/health/live >/dev/null; curl --max-time 20 -fsS "http://127.0.0.1:${port}/realms/ara-dev/.well-known/openid-configuration" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['issuer']=='http://localhost:${port}/realms/ara-dev'; assert d['authorization_endpoint'].startswith('http://localhost:${port}/')"; python3 deployment/scripts/oidc-dev-login.py owner "$(<.dev/secrets/owner_password)" owner@example.com owner group-admin "$(<.dev/secrets/group_admin_password)" group-admin@example.com group_admin; python3 deployment/scripts/oidc-dev-login.py group-admin "$(<.dev/secrets/group_admin_password)" group-admin@example.com group_admin user "$(<.dev/secrets/user_password)" user@example.com user; app up -d --force-recreate backend; wait_for backend-recreation "curl --max-time 5 -kfsS https://localhost/api/health/ready"; app exec -T backend python - < deployment/scripts/seed-dev.py; app exec -T backend python - <<'PY'
 import asyncio

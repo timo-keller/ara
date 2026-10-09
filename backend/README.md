@@ -196,6 +196,11 @@ their administered groups. Users are denied access.
 The optional `ARA_WEBEX_BOT_TOKEN_FILE` Docker secret enables outbound Webex bot
 delivery. `ARA_WEBEX_BOT_TOKEN` is also supported for explicit local/test settings;
 do not set both forms. Tokens are redacted and never persisted in the outbox.
+The local `run-dev.sh` launcher automatically mounts the optional token when
+`secrets/webex_bot_token` exists, falling back to `.dev/secrets/webex_bot_token`
+(or using the source path configured through `ARA_WEBEX_BOT_TOKEN_FILE`).
+With no file, it starts without Webex; rerun `./run-dev.sh up` after adding or
+removing the file.
 
 `PATCH /api/groups/{id}/webex` accepts `webex_space_link` (or null to disable
 room notifications). Add **ARA Notification Bot** to a group space, copy its

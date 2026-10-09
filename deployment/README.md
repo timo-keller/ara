@@ -85,14 +85,24 @@ the backend it is always mounted at `/run/secrets/webex_bot_token`. Use both
 Compose files for subsequent recreation and token rotation. Without the overlay,
 Webex is disabled and no token file is required.
 
-For the local launcher, retain ownership by your local user and opt in explicitly:
+The local launcher automatically enables Webex when `secrets/webex_bot_token`
+exists, falling back to `.dev/secrets/webex_bot_token` if the default file is
+absent. Keep the file owned by your local user with mode `600`, then run:
 
 ```sh
-ARA_DEV_WEBEX=1 ./run-dev.sh up
+./run-dev.sh up
 ```
 
-Use `ARA_DEV_WEBEX=1` for subsequent launcher commands when working with that
-deployment. The local Keycloak sample users have example email addresses; real
+No Webex enablement flag is needed. If the token file is absent, the launcher
+starts the app without Webex. After adding or removing the file, run
+`./run-dev.sh up` again to recreate the backend with the matching configuration.
+`ARA_WEBEX_BOT_TOKEN_FILE` may override the source path in `.dev/dev.env` or the
+host environment (for example, `./.dev/secrets/webex_bot_token`); detection uses
+that path instead. A missing custom path disables Webex. A present but empty or
+unreadable token file is a configuration error, rather than silently disabling
+Webex.
+
+The local Keycloak sample users have example email addresses; real
 personal delivery requires the user's OIDC email to identify their Webex account.
 
 In **Group administration**, add **ARA Notification Bot** to the intended group
