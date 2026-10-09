@@ -128,8 +128,9 @@ Assets are archived rather than deleted. Archived assets remain visible in
 history and audit views, cannot be newly reserved, and are hidden from normal
 asset lists by default. An authorized administrator can reactivate them.
 
-A future Webex integration may store a Webex room identifier per asset. The bot
-credential will be a deployment secret and will not be stored on an asset.
+The planned Webex integration stores a room identifier per group and a
+room-notification toggle per asset. The bot credential is a deployment secret
+and is not stored on an asset or group.
 
 ### 7.4 Reservations
 
@@ -312,9 +313,26 @@ Reservations without an end time cannot produce end-of-reservation reminders.
 Reminder offsets must be configurable rather than embedded in frontend code.
 
 Web Push for notifications while ARA is closed is not part of the initial
-decision. A later Webex bot integration will send messages to the room
-configured for an asset. Delivery attempts must use a persisted outbox and be
-retryable without duplicate messages.
+decision. The planned Webex bot integration sends end reminders directly to the
+reserving user's OIDC email. Personal start messages are sent only when a
+reservation originally scheduled for the future begins, never for immediate or
+past-requested starts.
+
+Webex rooms are configured per group rather than per asset. An asset-level
+"Send group-room notifications" checkbox defaults true and controls only room
+delivery. Rooms receive reservation-start messages (including immediate starts)
+and explicit asset-return messages, not cancellation or elapsed-end messages.
+Room messages include the asset, reserving user, event time, and an ARA link.
+Existing asset room settings will be discarded when the schema changes.
+Group administration provides room configuration, test send, and basic room
+delivery status, scoped to the responsible administrators.
+
+Delivery attempts use a persisted outbox with unique event/destination keys,
+retry state, and restart recovery. Local queueing is idempotent. Remote delivery
+cannot be promised exactly once: retries after an ambiguous timeout or a crash
+after acceptance by Webex may duplicate a message. Webex remains optional and
+independent of browser notification read state. Ticket 035 records the detailed
+plan and verification requirements.
 
 ## 15. Frontend
 
