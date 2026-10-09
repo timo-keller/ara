@@ -1,5 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { Observable, map, of, switchMap } from 'rxjs';
 
 export type Availability = '' | 'available' | 'reserved';
 
@@ -113,10 +114,23 @@ export class AssetCatalogueService {
     });
   }
 
-  schedule(assetId: string) {
-    return this.http.get<{ items: Reservation[] }>(`/api/assets/${assetId}/reservations`, {
-      params: new HttpParams().set('limit', 10),
-    });
+  schedule(assetId: string, offset = 0): Observable<{ items: Reservation[] }> {
+    let params = new HttpParams().set('limit', 10);
+    if (offset) params = params.set('offset', offset);
+    return this.http
+      .get<{ items: Reservation[]; total: number }>(`/api/assets/${assetId}/reservations`, {
+        params,
+      })
+      .pipe(
+        switchMap((page) => {
+          const nextOffset = offset + page.items.length;
+          return page.items.length && nextOffset < page.total
+            ? this.schedule(assetId, nextOffset).pipe(
+                map((next) => ({ items: [...page.items, ...next.items] })),
+              )
+            : of({ items: page.items });
+        }),
+      );
   }
 
   mine(filters: ReservationFilters) {

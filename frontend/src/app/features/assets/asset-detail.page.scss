@@ -18,6 +18,25 @@
   display: grid;
   gap: 0.75rem;
 }
+.start-selection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--syn-spacing-small);
+}
+.reservation-card::part(header) {
+  padding-bottom: var(--syn-spacing-x-small);
+}
+.reservation-card::part(body) {
+  padding-top: var(--syn-spacing-x-small);
+}
+.reservation-card h2 {
+  margin-bottom: 0;
+}
+.quick-booking {
+  justify-content: center;
+}
+.quick-booking,
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;

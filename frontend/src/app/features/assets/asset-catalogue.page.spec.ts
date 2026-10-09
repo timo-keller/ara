@@ -58,6 +58,7 @@ describe('AssetCataloguePage', () => {
         },
       ],
     });
+    http.expectOne('/api/assets/active/reservations?limit=10').flush({ items: [] });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Active asset');
     expect(fixture.nativeElement.textContent).toContain('Available now');
@@ -69,27 +70,33 @@ describe('AssetCataloguePage', () => {
       [...table.querySelectorAll('thead th')].map(
         (header: HTMLTableCellElement) => header.textContent,
       ),
-    ).toEqual(['Asset name', 'Asset type', 'Description', 'Availability', 'Details']);
+    ).toEqual(['Asset name', 'Asset type', 'Description', 'Availability', 'Book now', 'Details']);
     expect(
       [...table.querySelectorAll('tbody td')].map((cell: HTMLTableCellElement) =>
-        cell.textContent.trim(),
+        cell.textContent.trim().replace(/\s+/g, ' '),
       ),
     ).toEqual([
       'Active asset',
       'device',
       'No description provided.',
       'Available now',
+      '1 hour1 day1 week',
       'View details',
       'Reserved asset',
       'device',
       'No description provided.',
       'Reserved by Ada Lovelace',
+      'Unavailable',
       'View details',
     ]);
     expect(table.querySelector('td[data-label="Asset name"]')?.getAttribute('headers')).toBe(
       'asset-name',
     );
     expect(table.querySelector('a[aria-label="View details for Active asset"]')).not.toBeNull();
+    expect(table.querySelectorAll('syn-button')).toHaveLength(3);
+    expect(
+      table.querySelector('syn-button[aria-label="Book Active asset for 1 hour"]'),
+    ).not.toBeNull();
     expect(fixture.nativeElement.querySelector('syn-pagination')).not.toBeNull();
     const typeFilter = fixture.nativeElement.querySelector('syn-combobox');
     expect(typeFilter.hasAttribute('restricted')).toBe(true);
@@ -110,6 +117,121 @@ describe('AssetCataloguePage', () => {
     expect(navigate).toHaveBeenCalledTimes(1);
     fixture.componentInstance.changeAssetType('');
     expect(navigate).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['1 hour', 1],
+    ['1 day', 24],
+    ['1 week', 168],
+  ])('books an available asset for %s and refreshes availability', (label, hours) => {
+    const fixture = TestBed.createComponent(AssetCataloguePage);
+    fixture.detectChanges();
+    http.expectOne('/api/groups?archived=false&limit=100').flush({ items: [] });
+    const asset = {
+      id: 'available',
+      name: 'Available asset',
+      asset_type: 'device',
+      archived_at: null,
+      availability: 'available',
+    };
+    http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
+      items: [asset],
+      total: 1,
+      offset: 0,
+      limit: 10,
+    });
+    http.expectOne('/api/assets/available/reservations?limit=10').flush({ items: [] });
+    fixture.detectChanges();
+    const before = Date.now();
+    const button = fixture.nativeElement.querySelector(
+      `syn-button[aria-label="Book Available asset for ${label}"]`,
+    );
+    button.dispatchEvent(new MouseEvent('click'));
+    button.dispatchEvent(new MouseEvent('click'));
+    const request = http.expectOne('/api/reservations');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.asset_id).toBe(asset.id);
+    const start = new Date(request.request.body.starts_at).getTime();
+    expect(start).toBeGreaterThanOrEqual(before);
+    expect(start).toBeLessThanOrEqual(Date.now());
+    expect(new Date(request.request.body.ends_at).getTime() - start).toBe(
+      Number(hours) * 3_600_000,
+    );
+    fixture.detectChanges();
+    expect(
+      [...fixture.nativeElement.querySelectorAll('syn-button')].every(
+        (button) => (button as HTMLButtonElement).disabled,
+      ),
+    ).toBe(true);
+    request.flush({ id: 'reservation' });
+    http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
+      items: [{ ...asset, availability: 'reserved', reserved_by_display_name: 'You' }],
+      total: 1,
+      offset: 0,
+      limit: 10,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain(`Available asset booked for ${label}.`);
+    expect(fixture.nativeElement.querySelectorAll('table syn-button')).toHaveLength(0);
+  });
+
+  it('explains overlapping bookings and refreshes availability after a conflict', () => {
+    const fixture = TestBed.createComponent(AssetCataloguePage);
+    fixture.detectChanges();
+    http.expectOne('/api/groups?archived=false&limit=100').flush({ items: [] });
+    http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
+      items: [{ id: 'asset', name: 'Device', archived_at: null, availability: 'available' }],
+      total: 1,
+      offset: 0,
+      limit: 10,
+    });
+    http.expectOne('/api/assets/asset/reservations?limit=10').flush({ items: [] });
+    fixture.detectChanges();
+    fixture.nativeElement
+      .querySelector('syn-button[aria-label="Book Device for 1 week"]')
+      .dispatchEvent(new MouseEvent('click'));
+    http
+      .expectOne('/api/reservations')
+      .flush({ error: { code: 'reservation_conflict' } }, { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
+      items: [],
+      total: 0,
+      offset: 0,
+      limit: 10,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('another reservation overlaps this period');
+    expect(fixture.componentInstance.bookingAssetId()).toBeNull();
+  });
+
+  it('keeps blocked durations visible but disabled after checking the schedule', () => {
+    const fixture = TestBed.createComponent(AssetCataloguePage);
+    fixture.detectChanges();
+    http.expectOne('/api/groups?archived=false&limit=100').flush({ items: [] });
+    http.expectOne('/api/assets?offset=0&limit=10&archived=false').flush({
+      items: [{ id: 'asset', name: 'Device', archived_at: null, availability: 'available' }],
+      total: 1,
+      offset: 0,
+      limit: 10,
+    });
+    fixture.detectChanges();
+    const buttons = () =>
+      [...fixture.nativeElement.querySelectorAll('table syn-button')] as HTMLButtonElement[];
+    expect(buttons()).toHaveLength(3);
+    expect(buttons().every((button) => button.disabled)).toBe(true);
+    http.expectOne('/api/assets/asset/reservations?limit=10').flush({
+      items: [
+        {
+          status: 'active',
+          starts_at: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+          ends_at: null,
+        },
+      ],
+    });
+    fixture.detectChanges();
+    expect(buttons().map((button) => button.disabled)).toEqual([false, true, true]);
+    buttons()[1].dispatchEvent(new MouseEvent('click'));
+    http.expectNone('/api/reservations');
   });
 
   it('restores legacy asset_type links and serializes page resets in the URL', () => {

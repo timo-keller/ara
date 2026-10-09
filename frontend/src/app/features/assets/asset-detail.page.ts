@@ -14,6 +14,7 @@ import {
   Reservation,
   ReservationCreate,
 } from './asset-catalogue.service';
+import { QUICK_BOOKING_DURATIONS, availableBookingDurations } from './quick-booking';
 
 export function localDateTimeToUtc(value: string): string | null {
   const date = new Date(value);
@@ -59,6 +60,13 @@ export class AssetDetailPage {
   readonly reservationError = signal('');
   readonly reservationSuccess = signal('');
   readonly reserving = signal(false);
+  readonly bookingDurations = QUICK_BOOKING_DURATIONS;
+
+  canBookNow(hours: number): boolean {
+    return availableBookingDurations(this.reservations()).some(
+      (duration) => duration.hours === hours,
+    );
+  }
 
   constructor() {
     this.load();
@@ -87,6 +95,18 @@ export class AssetDetailPage {
         });
       },
       error: () => this.state.set('error'),
+    });
+  }
+
+  bookNow(hours: number): void {
+    const current = this.asset();
+    if (!current || this.reserving()) return;
+    if (!this.canBookNow(hours)) return;
+    const start = new Date();
+    this.createReservation({
+      asset_id: current.id,
+      starts_at: start.toISOString(),
+      ends_at: new Date(start.getTime() + hours * 3_600_000).toISOString(),
     });
   }
 
@@ -122,6 +142,7 @@ export class AssetDetailPage {
   }
 
   private createReservation(payload: ReservationCreate): void {
+    if (this.reserving()) return;
     this.reservationError.set('');
     this.reservationSuccess.set('');
     this.reserving.set(true);
@@ -134,7 +155,8 @@ export class AssetDetailPage {
       error: (error: unknown) => {
         this.reserving.set(false);
         this.reservationError.set(this.reservationErrorMessage(error));
-        if (this.reservationError().includes('already reserved')) this.load();
+        const body = (error as { error?: { error?: { code?: string } } }).error?.error;
+        if (body?.code === 'reservation_conflict') this.load();
       },
     });
   }

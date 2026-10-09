@@ -53,6 +53,12 @@
     </syn-select>
   </form>
 
+  @if (bookingSuccess()) {
+    <syn-alert open variant="success" aria-live="polite">{{ bookingSuccess() }}</syn-alert>
+  }
+  @if (bookingError()) {
+    <syn-alert open variant="error" aria-live="assertive">{{ bookingError() }}</syn-alert>
+  }
   @if (state() === 'loading') {
     <div class="state" aria-live="polite">
       <syn-spinner></syn-spinner><span>Loading assets…</span>
@@ -76,6 +82,7 @@
             <th id="asset-type" scope="col">Asset type</th>
             <th id="asset-description" scope="col">Description</th>
             <th id="asset-availability" scope="col">Availability</th>
+            <th id="asset-book" scope="col">Book now</th>
             <th id="asset-details" scope="col">Details</th>
           </tr>
         </thead>
@@ -95,6 +102,32 @@
                     ? 'Reserved by ' + asset.reserved_by_display_name
                     : 'Available now'
                 }}
+              </td>
+              <td data-label="Book now" headers="asset-book">
+                @if (asset.availability === 'available') {
+                  <div class="quick-booking">
+                    @for (duration of bookingDurations; track duration.hours) {
+                      <syn-button
+                        type="button"
+                        size="small"
+                        [disabled]="bookingAssetId() !== null || !canBookNow(asset, duration.hours)"
+                        [attr.title]="
+                          schedules()[asset.id] && !canBookNow(asset, duration.hours)
+                            ? 'Overlaps an existing reservation'
+                            : null
+                        "
+                        [attr.aria-label]="'Book ' + asset.name + ' for ' + duration.label"
+                        (click)="book(asset, duration.hours)"
+                        >{{ duration.label }}</syn-button
+                      >
+                    }
+                    @if (bookingAssetId() === asset.id) {
+                      <span role="status">Booking…</span>
+                    }
+                  </div>
+                } @else {
+                  <span>Unavailable</span>
+                }
               </td>
               <td data-label="Details" headers="asset-details">
                 <a

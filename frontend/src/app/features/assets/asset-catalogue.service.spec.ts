@@ -33,7 +33,21 @@ describe('AssetCatalogueService', () => {
 
   afterEach(() => http.verify());
 
-  it('requests a bounded, active-only reservation schedule for details', () => {
+  it('loads every schedule page so later conflicts are not missed', () => {
+    let items: unknown[] = [];
+    service.schedule('asset-1').subscribe((schedule) => {
+      items = schedule.items;
+    });
+    const first = Array.from({ length: 10 }, (_, index) => ({ id: String(index) }));
+    http.expectOne('/api/assets/asset-1/reservations?limit=10').flush({ items: first, total: 11 });
+    expect(items).toEqual([]);
+    http
+      .expectOne('/api/assets/asset-1/reservations?limit=10&offset=10')
+      .flush({ items: [{ id: 'future' }], total: 11 });
+    expect(items).toEqual([...first, { id: 'future' }]);
+  });
+
+  it('requests an active-only reservation schedule for details', () => {
     service.schedule('asset-1').subscribe();
     const request = http.expectOne('/api/assets/asset-1/reservations?limit=10');
     expect(request.request.method).toBe('GET');

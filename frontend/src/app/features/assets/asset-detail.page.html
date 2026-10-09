@@ -52,18 +52,33 @@
           <p>No remote-access metadata is available.</p>
         }
       </syn-card>
-      <syn-card>
+      <syn-card class="reservation-card">
         <h2 slot="header">Reserve this asset</h2>
+        <div class="quick-booking">
+          @for (duration of bookingDurations; track duration.hours) {
+            <syn-button
+              type="button"
+              size="large"
+              [disabled]="reserving() || !canBookNow(duration.hours)"
+              [attr.title]="!canBookNow(duration.hours) ? 'Overlaps an existing reservation' : null"
+              [attr.aria-label]="'Book ' + current.name + ' for ' + duration.label"
+              (click)="bookNow(duration.hours)"
+              >{{ duration.label }}</syn-button
+            >
+          }
+        </div>
         <p>Times are entered in your local time and sent as UTC.</p>
         <div class="reservation-form">
-          <syn-input
-            label="Start"
-            type="datetime-local"
-            required
-            [value]="startsAt()"
-            (synChangeEvent)="startsAt.set($any($event.target).value)"
-          ></syn-input>
-          <syn-button type="button" variant="text" (click)="selectNow()">Start now</syn-button>
+          <div class="start-selection">
+            <syn-input
+              label="Start"
+              type="datetime-local"
+              required
+              [value]="startsAt()"
+              (synChangeEvent)="startsAt.set($any($event.target).value)"
+            ></syn-input>
+            <syn-button type="button" variant="text" (click)="selectNow()">Start now</syn-button>
+          </div>
           <syn-input
             label="End (optional)"
             type="datetime-local"

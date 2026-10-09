@@ -22,12 +22,18 @@
   padding: var(--syn-spacing-small);
   border-bottom: 1px solid var(--syn-color-neutral-300);
   text-align: start;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .asset-results th {
   background: var(--syn-color-neutral-100);
   font-weight: var(--syn-font-weight-bold);
+}
+.quick-booking {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--syn-spacing-x-small);
 }
 .state {
   align-items: center;
