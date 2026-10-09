@@ -301,6 +301,12 @@ test('group admin is scoped in the UI, API, and audit history while a user is de
   await expect(
     admin.getByText('Configure the ARA Notification Bot token on the server.', { exact: true }),
   ).toBeVisible();
+  await expect(admin.locator('app-administration-page syn-alert[variant="error"]')).toHaveCount(0);
+  await expect(
+    admin.locator('syn-alert[variant="error"][closable]').filter({
+      hasText: 'Configure the ARA Notification Bot token on the server.',
+    }),
+  ).toBeVisible();
   await setSynInput(admin, 'Webex space link', '');
   await admin.getByRole('button', { name: 'Save space link', exact: true }).click();
   await expect(admin.getByText('Room notifications disabled.', { exact: true })).toBeVisible();

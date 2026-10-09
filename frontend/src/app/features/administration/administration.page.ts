@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { ToastService } from '../../core/notifications/toast.service';
 import { Component, computed, inject, signal } from '@angular/core';
 import { SynAlertComponent } from '@synergy-design-system/angular/components/alert';
 import { SynBadgeComponent } from '@synergy-design-system/angular/components/badge';
@@ -65,6 +66,7 @@ const emptyMappingDraft = (groupId = ''): MappingDraft => ({
 export class AdministrationPage {
   private readonly administration = inject(AdministrationService);
   private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
   readonly isOwner = computed(() => !!this.auth.roles()?.is_owner);
   readonly spaceLink = signal('');
   readonly webexStatus = signal<WebexStatus | null>(null);
@@ -91,7 +93,6 @@ export class AdministrationPage {
       );
   });
   readonly state = signal<'loading' | 'ready' | 'error'>('loading');
-  readonly error = signal<string | null>(null);
   readonly archiveConflicts = signal<ApiErrorDetail[]>([]);
   readonly groupDraft = signal<GroupDraft>(emptyGroupDraft());
   private readonly mappingDrafts = signal<Record<string, MappingDraft>>({});
@@ -113,7 +114,6 @@ export class AdministrationPage {
 
   load(selectedGroupId: string | null = this.groupDraft().id): void {
     this.state.set('loading');
-    this.error.set(null);
     this.administration.groups().subscribe({
       next: ({ items }) => {
         items = this.isOwner()
@@ -152,7 +152,6 @@ export class AdministrationPage {
   }
 
   createGroup(): void {
-    this.error.set(null);
     this.archiveConflicts.set([]);
     this.groupDraft.set(emptyGroupDraft());
     this.webexStatus.set(null);
@@ -182,8 +181,10 @@ export class AdministrationPage {
         this.webexStatus.set(status);
         this.webexState.set('ready');
       },
-      error: () => {
-        if (this.groupDraft().id === id) this.webexState.set('error');
+      error: (error) => {
+        if (this.groupDraft().id !== id) return;
+        this.webexState.set('error');
+        this.showApiError(error, 'Could not load delivery status. Try refreshing.');
       },
     });
   }
@@ -192,7 +193,6 @@ export class AdministrationPage {
     const id = this.groupDraft().id;
     if (!id || this.webexBusy()) return;
     this.webexBusy.set(true);
-    this.error.set(null);
     this.webexNotice.set('Resolving and saving Webex space…');
     this.administration.updateWebexRoom(id, this.spaceLink().trim() || null).subscribe({
       next: (group) => {
@@ -347,17 +347,17 @@ export class AdministrationPage {
     this.showApiError(error);
   }
 
-  private showApiError(error: unknown): void {
+  private showApiError(error: unknown, fallback = 'The request could not be completed.'): void {
     const apiError = this.apiError(error)?.error;
     const validation = apiError?.details
       ?.map((detail) => detail.message)
       .filter(Boolean)
       .join(' ');
-    this.showError(validation || apiError?.message || 'The request could not be completed.');
+    this.showError(validation || apiError?.message || fallback);
   }
 
   private showError(message: string): void {
-    this.error.set(message);
+    this.toast.error(message);
   }
 
   private apiError(error: unknown): ApiError | null {

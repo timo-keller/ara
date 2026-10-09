@@ -5,10 +5,6 @@
     groups.
   </p>
 
-  @if (error()) {
-    <syn-alert open variant="error" aria-live="assertive">{{ error() }}</syn-alert>
-  }
-
   @if (archiveConflicts().length) {
     <syn-alert open variant="warning" aria-live="assertive">
       <strong>This group cannot be archived yet.</strong> Resolve every active reservation below,
@@ -40,10 +36,10 @@
           <syn-spinner></syn-spinner> Loading administration data…
         </p>
       } @else if (state() === 'error') {
-        <syn-alert open variant="error"
-          >We could not load administration data.
-          <syn-button type="button" (click)="load()">Try again</syn-button></syn-alert
-        >
+        <p class="state" role="status">
+          We could not load administration data.
+          <syn-button type="button" (click)="load()">Try again</syn-button>
+        </p>
       } @else if (!orderedGroups().length) {
         <p class="state" aria-live="polite">No groups have been created.</p>
       } @else {
@@ -165,9 +161,9 @@
           @if (webexState() === 'loading') {
             <p role="status">Loading delivery status…</p>
           } @else if (webexState() === 'error') {
-            <syn-alert open variant="error"
-              >Could not load delivery status. Try refreshing.</syn-alert
-            >
+            <p role="status">
+              Delivery status unavailable. Use Refresh delivery status to try again.
+            </p>
           } @else if (webexStatus(); as status) {
             @if (!status.configured) {
               <syn-alert open variant="neutral"

@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '../../core/auth/auth.service';
+import { ToastService } from '../../core/notifications/toast.service';
 import { AdministrationPage } from './administration.page';
 import { Group, RoleMapping } from './administration.service';
 
@@ -38,7 +39,11 @@ describe('AdministrationPage', () => {
   beforeEach(async () => {
     globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
     await TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
     TestBed.inject(AuthService).loadSession().subscribe();
@@ -175,7 +180,10 @@ describe('AdministrationPage', () => {
     expect(page.selectedGroup()?.webex_space_link).toBe(link);
     expect(page.webexBusy()).toBe(false);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Add ARA Notification Bot and try again.');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      'Add ARA Notification Bot and try again.',
+    );
+    expect(fixture.nativeElement.querySelector('syn-alert[variant="error"]')).toBeNull();
     page.spaceLink.set('');
     page.saveWebexRoom();
     const clear = http.expectOne(`/api/groups/${group.id}/webex`);
@@ -186,6 +194,47 @@ describe('AdministrationPage', () => {
       .flush({ configured: true, counts: {}, items: [] });
     expect(page.selectedGroup()?.webex_room_id).toBeNull();
     expect(page.webexNotice()).toContain('disabled');
+  });
+
+  it.each(['test', 'status'] as const)(
+    'shows Webex %s request failures as error toasts',
+    (action) => {
+      const saved = { ...group, webex_room_id: 'room-1' };
+      const fixture = createReadyPage([saved]);
+      const page = fixture.componentInstance;
+      page.editGroup(saved);
+      http
+        .expectOne(`/api/groups/${group.id}/webex`)
+        .flush({ configured: true, counts: {}, items: [] });
+      if (action === 'test') page.testWebexRoom();
+      else page.refreshWebex();
+      http
+        .expectOne(`/api/groups/${group.id}/webex${action === 'test' ? '/test' : ''}`)
+        .flush(
+          { error: { message: 'Webex is unavailable. Try again later.' } },
+          { status: 503, statusText: 'Unavailable' },
+        );
+      fixture.detectChanges();
+      expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+        'Webex is unavailable. Try again later.',
+      );
+      expect(page.webexBusy()).toBe(false);
+      expect(fixture.nativeElement.querySelector('syn-alert[variant="error"]')).toBeNull();
+    },
+  );
+
+  it('does not show a toast for stale delivery-status failures after switching groups', () => {
+    const fixture = createReadyPage([group, archived]);
+    const page = fixture.componentInstance;
+    page.editGroup(group);
+    const first = http.expectOne(`/api/groups/${group.id}/webex`);
+    page.editGroup(archived);
+    http
+      .expectOne(`/api/groups/${archived.id}/webex`)
+      .flush({ configured: true, counts: {}, items: [] });
+    first.flush({}, { status: 500, statusText: 'Server error' });
+    expect(TestBed.inject(ToastService).error).not.toHaveBeenCalled();
+    expect(page.webexState()).toBe('ready');
   });
 
   it('shows only the selected group mappings in priority and stable ID order', () => {
@@ -369,7 +418,9 @@ describe('AdministrationPage', () => {
     page.changeMapping('expression', 'true');
     page.changeMapping('priority', '-1');
     page.saveMapping();
-    expect(page.error()).toBe('Priority must be a whole number of zero or more.');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      'Priority must be a whole number of zero or more.',
+    );
     const mapping: RoleMapping = {
       id: 'mapping-1',
       group_id: group.id,
@@ -400,7 +451,8 @@ describe('AdministrationPage', () => {
       { status: 422, statusText: 'Invalid' },
     );
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Too long');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith('Too long');
+    expect(fixture.nativeElement.querySelector('syn-alert[variant="error"]')).toBeNull();
 
     page.archiveGroup(group);
     http.expectOne('/api/groups/group-1/archive').flush(
@@ -447,7 +499,9 @@ describe('AdministrationPage', () => {
     page.changeMapping('expression', "contains(groups, 'ara-lab-users')");
     page.changeMapping('priority', '1.5');
     page.saveMapping();
-    expect(page.error()).toBe('Priority must be a whole number of zero or more.');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      'Priority must be a whole number of zero or more.',
+    );
 
     page.testMapping();
     const test = http.expectOne('/api/role-mappings/test');
@@ -472,5 +526,8 @@ describe('AdministrationPage', () => {
     http.expectOne('/api/groups?limit=100').flush({}, { status: 500, statusText: 'Server error' });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('We could not load administration data');
+    expect(TestBed.inject(ToastService).error).toHaveBeenCalledWith(
+      'The request could not be completed.',
+    );
   });
 });
