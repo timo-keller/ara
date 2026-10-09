@@ -216,6 +216,12 @@ rate limits, and missing bot membership without exposing remote response bodies.
 
 `GET /api/groups/{id}/webex` returns room-only counts and the latest 20 delivery
 states; `POST /api/groups/{id}/webex/test` queues a test and returns HTTP 202.
+Completed room deliveries (including tests) are deleted after one hour from
+creation; completed personal deliveries are retained for 30 days. Cleanup runs
+every 15 seconds in batches of 100, including when Webex is disabled. Pending
+and sending messages remain eligible for retries and recovery; active rate-limit
+and token cooldowns are retained until expiry. This removes ARA's delivery
+history and counts, not messages already sent to Webex.
 All require Owner or responsible Group Admin access; mutations also require
 CSRF protection. Room settings are audited. The asset API accepts
 `room_notifications_enabled` (default true), replacing its removed room-ID field.

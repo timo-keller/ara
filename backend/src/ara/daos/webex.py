@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ara.domain.models import WebexDelivery
@@ -49,13 +49,34 @@ class WebexDAO:
         counts = {state: count for state, count in rows}
         return items, counts
 
-    async def cleanup(self, cutoff: datetime) -> None:
+    async def cleanup(
+        self, *, now: datetime, room_cutoff: datetime, personal_cutoff: datetime
+    ) -> None:
         ids = (
             select(WebexDelivery.id)
             .where(
                 WebexDelivery.state.in_(("delivered", "failed", "skipped")),
-                WebexDelivery.created_at < cutoff,
+                or_(
+                    and_(
+                        WebexDelivery.destination_type == "room",
+                        WebexDelivery.created_at < room_cutoff,
+                    ),
+                    and_(
+                        WebexDelivery.destination_type == "person",
+                        WebexDelivery.created_at < personal_cutoff,
+                    ),
+                ),
+                # Dispatch uses these records to enforce a global cooldown.
+                # Retention must not resume requests before Webex permits them.
+                or_(
+                    WebexDelivery.error_code.is_(None),
+                    WebexDelivery.error_code.not_in(
+                        ("invalid_bot_token", "rate_limited")
+                    ),
+                    WebexDelivery.next_attempt_at <= now,
+                ),
             )
+            .order_by(WebexDelivery.created_at, WebexDelivery.id)
             .limit(100)
         )
         await self.session.execute(

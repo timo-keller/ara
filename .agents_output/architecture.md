@@ -334,11 +334,15 @@ write transaction. Failed lookups preserve previous settings; clearing the link
 disables room delivery. Existing group room-ID configurations remain supported.
 
 Delivery attempts use a persisted outbox with unique event/destination keys,
-retry state, and restart recovery. Local queueing is idempotent. Remote delivery
-cannot be promised exactly once: retries after an ambiguous timeout or a crash
-after acceptance by Webex may duplicate a message. Webex remains optional and
-independent of browser notification read state. Resolved ticket 035 records the
-delivery design, operational defaults, and verification results.
+retry state, and restart recovery. Local queueing is idempotent.
+Completed room-delivery history expires one hour after creation; personal
+delivery history expires after 30 days. Cleanup preserves pending/sending
+messages and active cooldowns and deletes at most 100 records per scheduler pass.
+Remote delivery cannot be promised exactly once: retries after an ambiguous
+timeout or a crash after acceptance by Webex may duplicate a message. Webex
+remains optional and independent of browser notification read state. Resolved
+ticket 035 records the delivery design, operational defaults, and verification
+results.
 
 ## 15. Frontend
 

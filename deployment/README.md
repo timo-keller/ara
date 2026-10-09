@@ -133,8 +133,13 @@ reminders catch up for at most 24 hours. Transient failures retry up to six
 attempts with exponential backoff; rate limits honor `Retry-After`. Invalid bot
 tokens pause all dispatch for 15 minutes and are visible as failed deliveries.
 Fix the token and recreate the backend; send another test to verify it. Terminal
-failures are not automatically replayed. Completed outbox records are retained
-for 30 days and cleaned in batches.
+failures are not automatically replayed. Completed room-delivery records,
+including tests, are retained for one hour from creation; completed personal
+delivery records are retained for 30 days. Cleanup runs every 15 seconds in
+batches of 100, even with Webex disabled. Pending/sending records and active
+rate-limit or token cooldowns are preserved. Expired history disappears from
+recent deliveries and counts after cleanup (larger backlogs take multiple
+passes). Messages already sent to a Webex space are not deleted.
 
 Queue entries are deduplicated locally. If Webex accepts a POST but the response
 is lost (or ARA crashes before saving success), retrying can duplicate the remote

@@ -807,3 +807,146 @@ async def test_recovered_exhausted_attempts_do_not_send_again(database: tuple) -
         item = await session.scalar(select(WebexDelivery))
         assert item.state == "failed" and item.error_code == "retry_exhausted"
         await client.close()
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_delivery_retention_by_destination_state_and_age(
+    database: tuple,
+    enabled: bool,
+) -> None:
+    factory, _, _, group = database
+    expected = set()
+    terminal = {"delivered", "failed", "skipped"}
+    async with factory() as session:
+        for destination, retention in (
+            ("room", timedelta(hours=1)),
+            ("person", timedelta(days=30)),
+        ):
+            for state in (*sorted(terminal), "pending", "sending"):
+                for delta in (-1, 0, 1):
+                    key = f"{destination}:{state}:{delta}"
+                    age = retention + timedelta(microseconds=delta)
+                    session.add(
+                        WebexDelivery(
+                            group_id=group.id,
+                            event_key=key,
+                            kind="test",
+                            destination_type=destination,
+                            destination="recipient",
+                            text="Retention test",
+                            state=state,
+                            created_at=NOW - age,
+                            scheduled_for=NOW - age,
+                            next_attempt_at=NOW,
+                        )
+                    )
+                    if state not in terminal or delta <= 0:
+                        expected.add(key)
+        # Personal messages must not inherit the shorter room retention.
+        session.add(
+            WebexDelivery(
+                group_id=group.id,
+                event_key="recent-personal",
+                kind="start",
+                destination_type="person",
+                text="Personal message",
+                state="delivered",
+                created_at=NOW - timedelta(hours=2),
+                scheduled_for=NOW,
+                next_attempt_at=NOW,
+            )
+        )
+        expected.add("recent-personal")
+        await session.commit()
+        service = WebexService(session, settings(enabled=enabled))
+        await service.generate_due()
+        remaining = list(await session.scalars(select(WebexDelivery)))
+        assert {item.event_key for item in remaining} == expected
+        items, counts = await service.deliveries.room_status(group.id)
+        assert len(items) == 12
+        assert counts == {
+            "delivered": 2,
+            "failed": 2,
+            "skipped": 2,
+            "pending": 3,
+            "sending": 3,
+        }
+
+
+@pytest.mark.parametrize("code", ["rate_limited", "invalid_bot_token"])
+async def test_room_retention_preserves_active_cooldown_until_expiry(
+    database: tuple,
+    monkeypatch: pytest.MonkeyPatch,
+    code: str,
+) -> None:
+    factory, _, _, group = database
+    async with factory() as session:
+        session.add(
+            WebexDelivery(
+                group_id=group.id,
+                event_key="cooldown",
+                kind="test",
+                destination_type="room",
+                text="Cooldown",
+                state="failed",
+                error_code=code,
+                created_at=NOW - timedelta(hours=2),
+                scheduled_for=NOW,
+                next_attempt_at=NOW + timedelta(minutes=1),
+            )
+        )
+        await session.commit()
+        service = WebexService(session, settings())
+        await service.generate_due()
+        assert (
+            await session.scalar(select(func.count()).select_from(WebexDelivery)) == 1
+        )
+        client = WebexClient(
+            "token",
+            httpx.MockTransport(
+                lambda _: pytest.fail("Active cooldown must suppress dispatch"),
+            ),
+        )
+        try:
+            assert await service.dispatch(client) == 0
+        finally:
+            await client.close()
+        monkeypatch.setattr(
+            "ara.services.webex.utc_now", lambda: NOW + timedelta(minutes=1)
+        )
+        await service.generate_due()
+        assert (
+            await session.scalar(select(func.count()).select_from(WebexDelivery)) == 0
+        )
+
+
+async def test_delivery_retention_deletes_in_bounded_batches(database: tuple) -> None:
+    factory, _, _, group = database
+    async with factory() as session:
+        session.add_all(
+            [
+                WebexDelivery(
+                    group_id=group.id,
+                    event_key=f"expired:{index}",
+                    kind="test",
+                    destination_type="room" if index % 2 else "person",
+                    text="Expired",
+                    state="delivered",
+                    created_at=NOW - timedelta(days=31),
+                    scheduled_for=NOW,
+                    next_attempt_at=NOW,
+                )
+                for index in range(102)
+            ]
+        )
+        await session.commit()
+        service = WebexService(session, settings(enabled=False))
+        await service.generate_due()
+        assert (
+            await session.scalar(select(func.count()).select_from(WebexDelivery)) == 2
+        )
+        await session.commit()
+        await service.generate_due()
+        assert (
+            await session.scalar(select(func.count()).select_from(WebexDelivery)) == 0
+        )

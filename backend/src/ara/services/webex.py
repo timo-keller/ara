@@ -23,7 +23,8 @@ from ara.services.authorization import AuthorizationService, EffectiveRoles
 
 START_CATCH_UP = timedelta(hours=1)
 REMINDER_CATCH_UP = timedelta(hours=24)
-DELIVERY_RETENTION = timedelta(days=30)
+ROOM_DELIVERY_RETENTION = timedelta(hours=1)
+PERSONAL_DELIVERY_RETENTION = timedelta(days=30)
 MAX_ATTEMPTS = 6
 DISPATCH_BATCH = 20
 
@@ -172,7 +173,11 @@ class WebexService:
                             personal=True,
                             offset=offset,
                         )
-        await self.deliveries.cleanup(now - DELIVERY_RETENTION)
+        await self.deliveries.cleanup(
+            now=now,
+            room_cutoff=now - ROOM_DELIVERY_RETENTION,
+            personal_cutoff=now - PERSONAL_DELIVERY_RETENTION,
+        )
         await self.session.commit()
 
     async def require_group(self, roles: EffectiveRoles, group_id: uuid.UUID) -> Group:

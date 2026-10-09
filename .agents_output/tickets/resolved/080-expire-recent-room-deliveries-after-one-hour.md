@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned. Implementation pending.
+Resolved. Implemented and verified.
 
 ## Goal
 
@@ -37,3 +37,17 @@ delivery records after one hour instead of retaining them for 30 days.
 
 - Ticket 035 - Add Webex delivery
 - Ticket 079 - Resolve Webex space links in group administration
+
+## Implementation and verification
+
+- Added separate one-hour room and 30-day personal retention cutoffs to the
+  existing outbox cleanup. Completed rows are deleted in oldest-first batches
+  of at most 100 on the existing 15-second scheduler pass.
+- Preserved pending/sending rows and active rate-limit/token cooldowns, including
+  when cleanup runs with Webex disabled.
+- Updated backend, deployment, and architecture documentation.
+- Tests cover terminal/nonterminal states, room/personal destinations, exact
+  cutoff boundaries, active cooldown expiry, status counts, disabled Webex, and
+  multi-pass batching.
+- Verification: all 154 backend tests passed (including 60 Webex tests), along
+  with Ruff formatting/lint and ty checks.
