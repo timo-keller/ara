@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs
 
+import httpx
 import pytest
 from joserfc import jwk, jwt
 
@@ -21,6 +23,45 @@ def settings() -> Settings:
             "ARA_OWNER_SUBJECTS": "subject",
         }
     )
+
+
+@pytest.mark.asyncio
+async def test_token_exchange_sends_pkce_verifier_and_client_authentication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    requests: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"id_token": "test-id-token"})
+
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        oidc.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(
+            transport=httpx.MockTransport(respond), **kwargs
+        ),
+    )
+    client = OidcClient(settings())
+    result = await client.exchange_code(
+        "test-code",
+        {"token_endpoint": "https://id.example.test/token"},
+        code_verifier=verifier,
+    )
+
+    assert result == "test-id-token"
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.method == "POST"
+    assert parse_qs(request.content.decode()) == {
+        "grant_type": ["authorization_code"],
+        "code": ["test-code"],
+        "redirect_uri": [client.redirect_uri],
+        "code_verifier": [verifier],
+    }
+    assert request.headers["authorization"] == "Basic YXJhOnNlY3JldA=="
 
 
 def test_backchannel_rewrites_only_public_issuer_relative_endpoints() -> None:

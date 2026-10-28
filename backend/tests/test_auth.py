@@ -1,4 +1,7 @@
 import asyncio
+import base64
+import hashlib
+import re
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Mapping
 from datetime import timedelta
@@ -38,6 +41,7 @@ class MockProvider(oidc.OidcClient):
         super().__init__(configured_settings)
         self.nonce: str | None = None
         self.end_session_endpoint: str | None = None
+        self.code_challenge: str | None = None
 
     async def discover(self) -> dict[str, str]:
         metadata = {
@@ -50,9 +54,19 @@ class MockProvider(oidc.OidcClient):
             metadata["end_session_endpoint"] = self.end_session_endpoint
         return metadata
 
-    async def exchange_code(self, code: str, metadata: Mapping[str, str]) -> str:
+    async def exchange_code(
+        self, code: str, metadata: Mapping[str, str], *, code_verifier: str
+    ) -> str:
         assert code == "authorization-code"
         assert metadata["token_endpoint"] == "https://id.example.test/token"
+        assert re.fullmatch(r"[A-Za-z0-9._~-]{43,128}", code_verifier)
+        self.code_challenge = (
+            base64.urlsafe_b64encode(
+                hashlib.sha256(code_verifier.encode("ascii")).digest()
+            )
+            .rstrip(b"=")
+            .decode("ascii")
+        )
         return "provider-id-token"
 
     async def validate_id_token(
@@ -121,6 +135,9 @@ def test_oidc_login_callback_session_and_logout(
     assert query["response_type"] == ["code"]
     assert query["client_id"] == ["ara"]
     assert query["redirect_uri"] == ["https://ara.example.test/auth/callback"]
+    assert query["code_challenge_method"] == ["S256"]
+    assert re.fullmatch(r"[A-Za-z0-9_-]{43}", query["code_challenge"][0])
+    assert "code_verifier" not in query
 
     callback = client.get(
         "/auth/callback",
@@ -130,6 +147,7 @@ def test_oidc_login_callback_session_and_logout(
 
     assert callback.status_code == 302
     assert provider.nonce is not None
+    assert query["code_challenge"] == [provider.code_challenge]
     assert "ara_session=" in callback.headers["set-cookie"]
     assert client.cookies.get(auth.CSRF_COOKIE)
     assert "provider-id-token" not in callback.text
@@ -166,6 +184,43 @@ def test_oidc_login_callback_session_and_logout(
     assert client.get("/auth/session").json() == {"authenticated": False}
 
 
+def test_login_generates_a_fresh_pkce_challenge(
+    authenticated_client: AuthenticatedClient,
+) -> None:
+    client, _provider, _session_factory = authenticated_client
+    first = client.get("/auth/login", follow_redirects=False)
+    second = client.get("/auth/login", follow_redirects=False)
+    first_query = parse_qs(urlparse(first.headers["location"]).query)
+    second_query = parse_qs(urlparse(second.headers["location"]).query)
+    assert first_query["code_challenge"] != second_query["code_challenge"]
+
+
+@pytest.mark.parametrize("verifier", [None, "", "short", "a" * 129, "!" * 43, 42])
+def test_callback_rejects_missing_or_invalid_pkce_verifier(
+    authenticated_client: AuthenticatedClient, verifier: object
+) -> None:
+    client, provider, _session_factory = authenticated_client
+    login = client.get("/auth/login", follow_redirects=False)
+    state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
+    secret = provider.settings.session_secret.get_secret_value()
+    payload = auth._decode(client.cookies[auth.STATE_COOKIE], secret)
+    assert payload is not None
+    if verifier is None:
+        del payload["code_verifier"]
+    else:
+        payload["code_verifier"] = verifier
+    client.cookies.clear()
+    client.cookies.set(auth.STATE_COOKIE, auth._encode(payload, secret))
+
+    response = client.get(
+        "/auth/callback", params={"code": "authorization-code", "state": state}
+    )
+
+    assert response.status_code == 401
+    assert provider.code_challenge is None
+    assert response.json()["error"]["code"] == "authentication_failed"
+
+
 def test_callback_failure_is_safe_and_does_not_leak_provider_values(
     authenticated_client: AuthenticatedClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -192,8 +247,12 @@ def test_callback_failure_is_safe_and_does_not_leak_provider_values(
     failing_client = oidc.OidcClient(provider.settings)
     monkeypatch.setattr(oidc.httpx, "AsyncClient", UnavailableProviderHttpClient)
 
-    async def failed_exchange(code: str, metadata: Mapping[str, str]) -> str:
-        return await failing_client.exchange_code(code, metadata)
+    async def failed_exchange(
+        code: str, metadata: Mapping[str, str], *, code_verifier: str
+    ) -> str:
+        return await failing_client.exchange_code(
+            code, metadata, code_verifier=code_verifier
+        )
 
     monkeypatch.setattr(provider, "exchange_code", failed_exchange)
     response = client.get(

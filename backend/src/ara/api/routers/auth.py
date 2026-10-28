@@ -174,9 +174,16 @@ async def require_csrf(
 async def login(
     oidc: Annotated[OidcClient, Depends(get_oidc_client)],
 ) -> RedirectResponse:
-    metadata, state, nonce, issued_at = await OidcLoginService(oidc).begin()
+    metadata, state, nonce, issued_at, code_verifier = await OidcLoginService(
+        oidc
+    ).begin()
     cookie = _encode(
-        {"state": state, "nonce": nonce, "issued_at": issued_at},
+        {
+            "state": state,
+            "nonce": nonce,
+            "issued_at": issued_at,
+            "code_verifier": code_verifier,
+        },
         oidc.settings.session_secret.get_secret_value(),
     )
     query = urlencode(
@@ -187,6 +194,12 @@ async def login(
             "scope": " ".join(oidc.settings.oidc_scopes),
             "state": state,
             "nonce": nonce,
+            "code_challenge": base64.urlsafe_b64encode(
+                hashlib.sha256(code_verifier.encode("ascii")).digest()
+            )
+            .rstrip(b"=")
+            .decode("ascii"),
+            "code_challenge_method": "S256",
         }
     )
     response = RedirectResponse(f"{metadata['authorization_endpoint']}?{query}", 302)

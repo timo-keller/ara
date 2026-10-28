@@ -129,7 +129,9 @@ class OidcClient:
             )
         return endpoint
 
-    async def exchange_code(self, code: str, metadata: Mapping[str, str]) -> str:
+    async def exchange_code(
+        self, code: str, metadata: Mapping[str, str], *, code_verifier: str
+    ) -> str:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
@@ -138,6 +140,7 @@ class OidcClient:
                         "grant_type": "authorization_code",
                         "code": code,
                         "redirect_uri": self.redirect_uri,
+                        "code_verifier": code_verifier,
                     },
                     auth=(
                         self.settings.oidc_client_id,
