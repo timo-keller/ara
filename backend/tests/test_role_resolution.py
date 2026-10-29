@@ -126,3 +126,27 @@ async def test_owner_claim_expression_grants_owner(
         database_session, "other", "contains(realm_access.roles, 'ara-owner')"
     ).resolve(user, {"realm_access": {"roles": ["ara-owner"]}})
     assert roles.is_owner is True
+
+
+@pytest.mark.parametrize(
+    ("claims", "expected_owner"),
+    [
+        ({"roles": ["ara-owner"]}, True),
+        ({"roles": ["ara-user"]}, False),
+        ({"roles": []}, False),
+        ({}, False),
+        ({"roles": None}, False),
+    ],
+)
+async def test_top_level_owner_role_claim(
+    database_session: AsyncSession,
+    claims: dict[str, object],
+    expected_owner: bool,
+) -> None:
+    user = User(oidc_issuer="https://issuer.example", oidc_subject="not-allowlisted")
+    database_session.add(user)
+    await database_session.commit()
+    roles = await RoleResolutionService(
+        database_session, "no-local-bootstrap-owner", "contains(roles, 'ara-owner')"
+    ).resolve(user, claims)
+    assert roles.is_owner is expected_owner
