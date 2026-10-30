@@ -34,7 +34,7 @@ from ara.main import create_app
 from ara.services.authorization import EffectiveRoles
 from ara.services.groups import GroupService
 from ara.services.reservations import ReservationService
-from ara.services.webex import WebexService
+from ara.services.webex import WebexService, human_duration
 from ara.services.webex_links import parse_space_link
 
 NOW = datetime(2030, 1, 2, 10, tzinfo=UTC)
@@ -302,7 +302,72 @@ async def test_asset_names_are_linked_without_a_plaintext_url(
         assert url not in payload["text"]
         assert f"[{escaped_name}]({url})" in payload["markdown"]
         assert payload["markdown"].count(url) == 1
-        assert payload["markdown"].endswith(r"Reserved by: User \[lab\] \*A\*")
+        duration = "less than a minute" if kind == "return" else "2 hours"
+        assert payload["markdown"].endswith(
+            rf"Reserved by: User \[lab\] \*A\* for {duration}"
+        )
+        assert payload["text"].endswith(f"Reserved by: User [lab] *A* for {duration}")
+
+
+@pytest.mark.parametrize(
+    "duration,expected",
+    [
+        (timedelta(), "less than a minute"),
+        (timedelta(seconds=59), "less than a minute"),
+        (timedelta(minutes=1), "1 minute"),
+        (timedelta(minutes=2), "2 minutes"),
+        (timedelta(hours=1), "1 hour"),
+        (timedelta(hours=2, minutes=30), "2 hours 30 minutes"),
+        (timedelta(days=1), "1 day"),
+        (timedelta(days=2, hours=1, minutes=5), "2 days 1 hour 5 minutes"),
+    ],
+)
+def test_human_duration(duration: timedelta, expected: str) -> None:
+    assert human_duration(duration) == expected
+
+
+@pytest.mark.parametrize(
+    "kind,end_hours,elapsed_hours,expected",
+    [
+        ("start", 3, 0, "3 hours"),
+        ("start", None, 0, "an indefinite period"),
+        ("end_reminder", 3, 2, "3 hours"),
+        ("return", 3, 1, "1 hour"),
+        ("return", 3, 4, "4 hours"),
+        ("return", None, 2, "2 hours"),
+    ],
+)
+async def test_notification_reservation_durations(
+    database: tuple,
+    kind: str,
+    end_hours: int | None,
+    elapsed_hours: int,
+    expected: str,
+) -> None:
+    factory, asset, user, _ = database
+    async with factory() as session:
+        reservation = Reservation(
+            asset_id=asset.id,
+            user_id=user.id,
+            starts_at=NOW,
+            ends_at=NOW + timedelta(hours=end_hours) if end_hours is not None else None,
+        )
+        session.add(reservation)
+        await session.flush()
+        await WebexService(session, settings()).enqueue_event(
+            reservation,
+            kind,
+            NOW + timedelta(hours=elapsed_hours),
+            personal=True,
+            room=True,
+            offset=60,
+        )
+        await session.commit()
+        deliveries = list(await session.scalars(select(WebexDelivery)))
+        assert len(deliveries) == 2
+        for delivery in deliveries:
+            for message in (delivery.text, delivery.markdown):
+                assert message.endswith(f"Reserved by: Test User for {expected}")
 
 
 @pytest.mark.parametrize(

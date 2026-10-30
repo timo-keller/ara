@@ -34,6 +34,18 @@ def escape_markdown(value: str) -> str:
     return re.sub(r"([\\`*_\[\]<>])", r"\\\1", value)
 
 
+def human_duration(duration: timedelta) -> str:
+    minutes = max(0, int(duration.total_seconds()) // 60)
+    days, minutes = divmod(minutes, 24 * 60)
+    hours, minutes = divmod(minutes, 60)
+    parts = [
+        f"{amount} {unit}{'s' if amount != 1 else ''}"
+        for amount, unit in ((days, "day"), (hours, "hour"), (minutes, "minute"))
+        if amount
+    ]
+    return " ".join(parts) or "less than a minute"
+
+
 class WebexService:
     def __init__(self, session: AsyncSession, settings: Settings | None = None) -> None:
         self.session = session
@@ -77,7 +89,16 @@ class WebexService:
                 f"{scheduled_for.isoformat(timespec='seconds')}."
             )
         display_name = user.display_name or "ARA user"
-        text = f"{description.format(asset=asset.name)}\nReserved by: {display_name}"
+        duration_end = scheduled_for if kind == "return" else reservation.ends_at
+        duration = (
+            human_duration(duration_end - reservation.starts_at)
+            if duration_end is not None
+            else "an indefinite period"
+        )
+        text = (
+            f"{description.format(asset=asset.name)}\n"
+            f"Reserved by: {display_name} for {duration}"
+        )
         asset_url = (
             (f"{str(self.settings.public_url).rstrip('/')}/assets/{asset.id}")
             .replace("(", "%28")
@@ -86,7 +107,7 @@ class WebexService:
         asset_link = f"[{escape_markdown(asset.name)}]({asset_url})"
         markdown = (
             f"{description.format(asset=asset_link)}\n\n"
-            f"Reserved by: {escape_markdown(display_name)}"
+            f"Reserved by: {escape_markdown(display_name)} for {duration}"
         )
         for destination_type, enabled, destination, reason in (
             ("person", personal, user.email, "missing_email"),
