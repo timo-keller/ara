@@ -305,6 +305,46 @@ async def test_asset_names_are_linked_without_a_plaintext_url(
         assert payload["markdown"].endswith(r"Reserved by: User \[lab\] \*A\*")
 
 
+@pytest.mark.parametrize(
+    "kind,expected_time",
+    [
+        ("start", "2030-01-02T10:00:12+00:00"),
+        ("return", "2030-01-02T11:00:34+00:00"),
+        ("end_reminder", "2030-01-02T12:00:56+00:00"),
+    ],
+)
+async def test_notification_timestamps_use_whole_seconds(
+    database: tuple, kind: str, expected_time: str
+) -> None:
+    factory, asset, user, _ = database
+    async with factory() as session:
+        reservation = Reservation(
+            asset_id=asset.id,
+            user_id=user.id,
+            starts_at=NOW.replace(second=12, microsecond=123456),
+            ends_at=(NOW + timedelta(hours=2)).replace(second=56, microsecond=654321),
+        )
+        session.add(reservation)
+        await session.flush()
+        await WebexService(session, settings()).enqueue_event(
+            reservation,
+            kind,
+            (NOW + timedelta(hours=1)).replace(second=34, microsecond=987654),
+            room=True,
+            offset=60,
+        )
+        await session.commit()
+        delivery = await session.scalar(select(WebexDelivery))
+        for message in (delivery.text, delivery.markdown):
+            assert f"{expected_time}." in message
+            assert ".123456" not in message
+            assert ".654321" not in message
+            assert ".987654" not in message
+        if kind == "end_reminder":
+            assert reservation.ends_at is not None
+            assert reservation.ends_at.isoformat() in delivery.event_key
+
+
 async def test_client_supports_plain_text_messages() -> None:
     def handle(request: httpx.Request) -> httpx.Response:
         assert json.loads(request.content) == {"roomId": "room-1", "text": "Test"}

@@ -64,15 +64,18 @@ class WebexService:
             key += f":{reservation.ends_at.isoformat()}:{offset}"
             description = (
                 "Reservation end reminder: {asset} is scheduled to end at "
-                f"{reservation.ends_at.isoformat()}."
+                f"{reservation.ends_at.isoformat(timespec='seconds')}."
             )
         elif kind == "start":
             description = (
                 "Reservation started: {asset} at "
-                f"{reservation.starts_at.isoformat()}."
+                f"{reservation.starts_at.isoformat(timespec='seconds')}."
             )
         else:
-            description = f"Asset returned: {{asset}} at {scheduled_for.isoformat()}."
+            description = (
+                "Asset returned: {asset} at "
+                f"{scheduled_for.isoformat(timespec='seconds')}."
+            )
         display_name = user.display_name or "ARA user"
         text = f"{description.format(asset=asset.name)}\nReserved by: {display_name}"
         asset_url = (
