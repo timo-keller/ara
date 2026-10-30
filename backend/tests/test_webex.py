@@ -246,9 +246,75 @@ async def test_start_timing_and_destinations(
         assert all(
             message.kind == "start"
             and "Test User" in message.text
-            and f"/assets/{asset.id}" in message.text
+            and f"/assets/{asset.id}" not in message.text
+            and f"[Laptop]({str(settings().public_url).rstrip('/')}/assets/{asset.id})"
+            in message.markdown
             for message in messages
         )
+
+
+@pytest.mark.parametrize("kind", ["start", "return", "end_reminder"])
+@pytest.mark.parametrize(
+    "name,escaped_name",
+    [
+        ("Laptop", "Laptop"),
+        (r"Laptop [lab] *A* _B_ `C` \D", r"Laptop \[lab\] \*A\* \_B\_ \`C\` \\D"),
+    ],
+)
+async def test_asset_names_are_linked_without_a_plaintext_url(
+    database: tuple, kind: str, name: str, escaped_name: str
+) -> None:
+    factory, asset, user, _ = database
+    configured = settings()
+    async with factory() as session:
+        (await session.get(Asset, asset.id)).name = name
+        (await session.get(User, user.id)).display_name = "User [lab] *A*"
+        reservation = Reservation(
+            asset_id=asset.id,
+            user_id=user.id,
+            starts_at=NOW,
+            ends_at=NOW + timedelta(hours=2),
+        )
+        session.add(reservation)
+        await session.flush()
+        await WebexService(session, configured).enqueue_event(
+            reservation, kind, NOW, personal=True, room=True, offset=60
+        )
+        await session.commit()
+
+    sent = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={"id": "message-1"})
+
+    client = WebexClient("token", httpx.MockTransport(handle))
+    try:
+        async with factory() as session:
+            assert await WebexService(session, configured).dispatch(client) == 2
+    finally:
+        await client.close()
+    url = f"{str(configured.public_url).rstrip('/')}/assets/{asset.id}"
+    assert len(sent) == 2
+    assert {"roomId", "toPersonEmail"} <= set().union(*(item.keys() for item in sent))
+    for payload in sent:
+        assert name in payload["text"]
+        assert url not in payload["text"]
+        assert f"[{escaped_name}]({url})" in payload["markdown"]
+        assert payload["markdown"].count(url) == 1
+        assert payload["markdown"].endswith(r"Reserved by: User \[lab\] \*A\*")
+
+
+async def test_client_supports_plain_text_messages() -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content) == {"roomId": "room-1", "text": "Test"}
+        return httpx.Response(200, json={"id": "test-1"})
+
+    client = WebexClient("token", httpx.MockTransport(handle))
+    try:
+        assert (await client.send("room", "room-1", "Test")).message_id == "test-1"
+    finally:
+        await client.close()
 
 
 async def test_personal_reminders_ignore_room_settings_and_track_extensions(
@@ -297,6 +363,7 @@ async def test_personal_reminders_ignore_room_settings_and_track_extensions(
         assert len(sent) == 1
         assert sent[0]["toPersonEmail"] == user.email
         assert "10:30" in sent[0]["text"]
+        assert "[Laptop](" in sent[0]["markdown"]
         await client.close()
 
 

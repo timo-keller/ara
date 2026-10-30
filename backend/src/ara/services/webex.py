@@ -1,5 +1,6 @@
 """Transactional notification production and durable, bounded Webex dispatch."""
 
+import re
 import uuid
 from datetime import datetime, timedelta
 
@@ -27,6 +28,10 @@ ROOM_DELIVERY_RETENTION = timedelta(hours=1)
 PERSONAL_DELIVERY_RETENTION = timedelta(days=30)
 MAX_ATTEMPTS = 6
 DISPATCH_BATCH = 20
+
+
+def escape_markdown(value: str) -> str:
+    return re.sub(r"([\\`*_\[\]<>])", r"\\\1", value)
 
 
 class WebexService:
@@ -58,21 +63,27 @@ class WebexService:
             assert reservation.ends_at is not None
             key += f":{reservation.ends_at.isoformat()}:{offset}"
             description = (
-                f"Reservation end reminder: {asset.name} is scheduled to end at "
+                "Reservation end reminder: {asset} is scheduled to end at "
                 f"{reservation.ends_at.isoformat()}."
             )
         elif kind == "start":
             description = (
-                f"Reservation started: {asset.name} at "
+                "Reservation started: {asset} at "
                 f"{reservation.starts_at.isoformat()}."
             )
         else:
-            description = (
-                f"Asset returned: {asset.name} at {scheduled_for.isoformat()}."
-            )
-        text = (
-            f"{description}\nReserved by: {user.display_name or 'ARA user'}\n"
-            f"{str(self.settings.public_url).rstrip('/')}/assets/{asset.id}"
+            description = f"Asset returned: {{asset}} at {scheduled_for.isoformat()}."
+        display_name = user.display_name or "ARA user"
+        text = f"{description.format(asset=asset.name)}\nReserved by: {display_name}"
+        asset_url = (
+            (f"{str(self.settings.public_url).rstrip('/')}/assets/{asset.id}")
+            .replace("(", "%28")
+            .replace(")", "%29")
+        )
+        asset_link = f"[{escape_markdown(asset.name)}]({asset_url})"
+        markdown = (
+            f"{description.format(asset=asset_link)}\n\n"
+            f"Reserved by: {escape_markdown(display_name)}"
         )
         for destination_type, enabled, destination, reason in (
             ("person", personal, user.email, "missing_email"),
@@ -92,6 +103,7 @@ class WebexService:
                     destination_type=destination_type,
                     destination=destination,
                     text=text,
+                    markdown=markdown,
                     scheduled_for=scheduled_for,
                     expected_end=reservation.ends_at
                     if kind == "end_reminder"
@@ -317,17 +329,20 @@ class WebexService:
                 delivery.claimed_at = None
                 await self.session.commit()
                 continue
-            destination_type, destination, message = (
+            destination_type, destination, message, markdown = (
                 delivery.destination_type,
                 delivery.destination,
                 delivery.text,
+                delivery.markdown,
             )
             assert destination is not None
             # Persist the attempt before sending, then close the read/write
             # transaction while waiting on the network.
             delivery.attempts += 1
             await self.session.commit()
-            sent = await client.send(destination_type, destination, message)
+            sent = await client.send(
+                destination_type, destination, message, markdown=markdown
+            )
             delivery.claimed_at = None
             delivery.error_code = sent.error_code
             if sent.error_code == "rate_limited" and sent.retry_after is not None:

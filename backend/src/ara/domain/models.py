@@ -395,6 +395,7 @@ class WebexDelivery(Base):
     destination_type: Mapped[str] = mapped_column(String(20), nullable=False)
     destination: Mapped[str | None] = mapped_column(String(320))
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    markdown: Mapped[str | None] = mapped_column(Text)
     scheduled_for: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     expected_end: Mapped[datetime | None] = mapped_column(UTCDateTime)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")

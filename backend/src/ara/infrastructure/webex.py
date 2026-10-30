@@ -136,13 +136,19 @@ class WebexClient:
         raise resolution_error("webex_unavailable")
 
     async def send(
-        self, destination_type: str, destination: str, text: str
+        self,
+        destination_type: str,
+        destination: str,
+        text: str,
+        *,
+        markdown: str | None = None,
     ) -> SendResult:
         field = "roomId" if destination_type == "room" else "toPersonEmail"
+        payload = {field: destination, "text": text}
+        if markdown is not None:
+            payload["markdown"] = markdown
         try:
-            response = await self.http.post(
-                "messages", json={field: destination, "text": text}
-            )
+            response = await self.http.post("messages", json=payload)
         except httpx.RequestError:
             return SendResult(error_code="network_error", retry_after=30)
         if response.status_code in (200, 201):
